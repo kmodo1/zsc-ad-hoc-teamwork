@@ -1,0 +1,22 @@
+# Fast-running settings used to produce results/ in this repository and in
+# CI. Suitable for a laptop CPU in a few minutes; not meant to produce a
+# fully-converged population. See configs/cluster.yaml for the scale we
+# intend to run on the UMIACS cluster for the real experiments.
+population:
+  n_policies: 3
+  n_iterations: 250
+  episodes_per_iteration: 6
+  horizon: 150
+  hidden_size: 32
+  entropy_coef: 0.03
+
+crossplay:
+  n_episodes: 10
+
+adaptive_ensemble:
+  embed_dim: 16
+  n_iterations: 150
+  episodes_per_iteration: 4
+
+evaluation:
+  n_episodes_per_partner: 10
