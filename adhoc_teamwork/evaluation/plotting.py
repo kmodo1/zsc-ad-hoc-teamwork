@@ -66,3 +66,46 @@ def plot_weight_trajectory(weight_history: np.ndarray, policy_names: List[str], 
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
+
+
+def plot_family_comparison(rows: Dict[str, Dict[str, float]], out_path: str, title: str = "Team return by method"):
+    """``rows``: {family: {"mean": ..., "std_across_seeds": ...}}, already sorted."""
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    names = list(rows.keys())
+    means = [rows[n]["mean"] for n in names]
+    stds = [rows[n]["std_across_seeds"] for n in names]
+    fig, ax = plt.subplots(figsize=(8, max(3.0, 0.38 * len(names) + 1)))
+    y = np.arange(len(names))
+    ax.barh(y, means, xerr=stds, capsize=3, color="#4c78a8")
+    ax.set_yticks(y)
+    ax.set_yticklabels(names, fontsize=8)
+    ax.invert_yaxis()
+    ax.set_xlabel("mean team return (error bars: std across seeds)")
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_weight_trace_grid(traces: Dict[str, np.ndarray], policy_names: List[str], out_path: str, title: str = "Ensemble weights over an episode"):
+    """``traces``: {partner: (T, K) weights}. Small multiples so that partner
+    dependence and within-episode change are both visible at a glance."""
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    partners = list(traces.keys())
+    cols = 5
+    rows = int(np.ceil(len(partners) / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(2.6 * cols, 1.9 * rows), sharex=True, sharey=True, squeeze=False)
+    for ax in axes.flat:
+        ax.set_visible(False)
+    for ax, partner in zip(axes.flat, partners):
+        ax.set_visible(True)
+        ax.stackplot(np.arange(traces[partner].shape[0]), traces[partner].T, labels=policy_names, linewidth=0)
+        ax.set_title(partner, fontsize=8)
+        ax.set_ylim(0, 1)
+        ax.tick_params(labelsize=7)
+    handles, labels = axes.flat[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=min(len(labels), 10), fontsize=7, frameon=False)
+    fig.suptitle(title, fontsize=10)
+    fig.tight_layout(rect=(0, 0.05, 1, 0.97))
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)

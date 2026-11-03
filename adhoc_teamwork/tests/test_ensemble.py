@@ -103,3 +103,55 @@ def test_agents_run_full_episode_without_error():
         agent = AgentCls(subs, **extra) if extra else AgentCls(subs)
         traj = run_episode(env, [agent, ScriptedBiasedAgent("onion_runner", noise=0.1)], seed=0)
         assert traj.length == 15
+
+
+def test_batched_and_single_episode_inference_agree():
+    subs = _make_subpolicies()
+    encoder = TrajectoryEncoder(OBS_DIM, NUM_ACTIONS, hidden_size=16, embed_dim=8)
+    wnet = WeightingNetwork(embed_dim=8, num_policies=K)
+    make_agents = {
+        "adaptive": lambda: AdaptiveEnsembleAgent(subs, encoder, wnet),
+        "selection": lambda: PolicySelectionAgent(subs, encoder, wnet),
+        "static": lambda: StaticEnsembleAgent(subs),
+    }
+    obs_seq = np.random.randn(5, 3, OBS_DIM).astype(np.float32)  # (T, B, obs_dim)
+    actions = np.random.randint(0, NUM_ACTIONS, size=(5, 3))
+    for name, make in make_agents.items():
+        batched = make()
+        batched.reset(batch_size=3)
+        singles = [make() for _ in range(3)]
+        for a in singles:
+            a.reset()
+        for t in range(5):
+            batch_probs = batched.probs_batch(obs_seq[t]).numpy()
+            batched.observe_partner_action(actions[t])
+            for b, a in enumerate(singles):
+                assert np.allclose(batch_probs[b], a.action_probs(obs_seq[t, b]), atol=1e-5), f"{name} batch element {b} at t={t}"
+                a.observe_partner_action(int(actions[t, b]))
+
+
+def test_argmax_actions_takes_most_probable_action():
+    subs = _make_subpolicies()
+    encoder = TrajectoryEncoder(OBS_DIM, NUM_ACTIONS, hidden_size=16, embed_dim=8)
+    wnet = WeightingNetwork(embed_dim=8, num_policies=K)
+    obs = np.random.randn(OBS_DIM).astype(np.float32)
+    probe = AdaptiveEnsembleAgent(subs, encoder, wnet)
+    probe.reset()
+    expected = int(np.argmax(probe.action_probs(obs)))
+    agent = AdaptiveEnsembleAgent(subs, encoder, wnet, argmax_actions=True)
+    agent.reset()
+    assert agent.act(obs) == expected
+
+
+def test_policy_selection_uses_only_the_selected_sub_policy():
+    subs = _make_subpolicies()
+    encoder = TrajectoryEncoder(OBS_DIM, NUM_ACTIONS, hidden_size=16, embed_dim=8)
+    wnet = WeightingNetwork(embed_dim=8, num_policies=K)
+    agent = PolicySelectionAgent(subs, encoder, wnet)
+    agent.reset()
+    obs = np.random.randn(OBS_DIM).astype(np.float32)
+    probs = agent.action_probs(obs)
+    selected = int(agent.last_selected[0])
+    assert selected == int(np.argmax(agent.last_weights))
+    sub_probs, _ = subs[selected].action_probs(torch.as_tensor(obs)[None], subs[selected].initial_state(1))
+    assert np.allclose(probs, sub_probs[0].detach().numpy(), atol=1e-6)

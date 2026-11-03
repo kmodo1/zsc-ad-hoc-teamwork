@@ -56,9 +56,13 @@ class ActorCritic(nn.Module):
         log_prob = dist.log_prob(action)
         return action, log_prob, value, new_rnn_state
 
-    def action_probs(self, obs: torch.Tensor, rnn_state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def action_probs(
+        self, obs: torch.Tensor, rnn_state: torch.Tensor, available_actions: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Return (probs over actions, new_rnn_state) without sampling."""
         logits, _value, new_rnn_state = self.forward(obs, rnn_state)
+        if available_actions is not None:
+            logits = logits.masked_fill(~available_actions.bool(), -1e10)
         probs = torch.softmax(logits, dim=-1)
         return probs, new_rnn_state
 

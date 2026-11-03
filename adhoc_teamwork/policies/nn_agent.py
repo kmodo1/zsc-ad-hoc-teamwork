@@ -1,5 +1,7 @@
-"""Wraps a trained :class:`ActorCritic` network for inference, implementing
-the common :class:`Agent` interface.
+"""Wraps a trained policy network for inference, implementing the common
+:class:`Agent` interface. Works with anything exposing ``initial_state`` and
+``action_probs``: our :class:`ActorCritic` or a ZSC-Eval actor via
+:class:`~adhoc_teamwork.policies.zsceval_policy.ZSCEvalPolicy`.
 """
 
 from __future__ import annotations
@@ -7,39 +9,23 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from adhoc_teamwork.policies.agent_api import Agent
-from adhoc_teamwork.policies.networks import ActorCritic
+from adhoc_teamwork.policies.agent_api import TorchPolicyAgent
 
 
-class NNAgent(Agent):
-    def __init__(self, policy: ActorCritic, device: torch.device = torch.device("cpu")):
+class NNAgent(TorchPolicyAgent):
+    def __init__(self, policy, device: torch.device = torch.device("cpu"), argmax_actions: bool = False):
+        super().__init__(device, argmax_actions)
         self.policy = policy
-        self.device = device
         self.rnn_state = None
 
-    def reset(self) -> None:
-        self.rnn_state = self.policy.initial_state(1, self.device)
+    def reset(self, batch_size: int = 1) -> None:
+        self.rnn_state = self.policy.initial_state(batch_size, self.device)
 
-    def _probs_and_advance(self, obs: np.ndarray) -> np.ndarray:
-        obs_t = torch.as_tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-        with torch.no_grad():
-            probs, new_rnn_state = self.policy.action_probs(obs_t, self.rnn_state)
-        self.rnn_state = new_rnn_state
-        return probs.squeeze(0).cpu().numpy()
-
-    def act(self, obs: np.ndarray, deterministic: bool = False) -> int:
-        probs = self._probs_and_advance(obs)
-        if deterministic:
-            return int(np.argmax(probs))
-        return int(np.random.choice(len(probs), p=probs))
-
-    def action_probs(self, obs: np.ndarray) -> np.ndarray:
-        # NOTE: this advances the recurrent state (as does `act`). Callers
-        # that need both the probs *and* a sampled action for the same
-        # timestep should use `act_with_probs` instead of calling both.
-        return self._probs_and_advance(obs)
+    def _forward_probs(self, obs_t, available_t):
+        probs, self.rnn_state = self.policy.action_probs(obs_t, self.rnn_state, available_t)
+        return probs
 
     def act_with_probs(self, obs: np.ndarray, deterministic: bool = False):
-        probs = self._probs_and_advance(obs)
-        action = int(np.argmax(probs)) if deterministic else int(np.random.choice(len(probs), p=probs))
+        probs = self.action_probs(obs)
+        action = int(np.argmax(probs)) if deterministic else int(np.random.choice(len(probs), p=probs / probs.sum()))
         return action, probs

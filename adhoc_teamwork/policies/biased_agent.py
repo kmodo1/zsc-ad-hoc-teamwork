@@ -101,7 +101,7 @@ class ScriptedBiasedAgent(Agent):
         self._w = grid_width
         self._h = grid_height
 
-    def reset(self) -> None:
+    def reset(self, batch_size: int = 1) -> None:
         pass
 
     def _scripted_action(self, obs: np.ndarray) -> int:
@@ -139,12 +139,12 @@ class ScriptedBiasedAgent(Agent):
 
         raise RuntimeError(f"unknown role {self.role}")
 
-    def act(self, obs: np.ndarray, deterministic: bool = False) -> int:
+    def act(self, obs: np.ndarray, deterministic: bool = False, available_actions=None) -> int:
         if not deterministic and np.random.rand() < self.noise:
             return int(np.random.randint(NUM_ACTIONS))
         return self._scripted_action(obs)
 
-    def action_probs(self, obs: np.ndarray) -> np.ndarray:
+    def action_probs(self, obs: np.ndarray, available_actions=None) -> np.ndarray:
         probs = np.full(NUM_ACTIONS, self.noise / NUM_ACTIONS, dtype=np.float32)
         probs[self._scripted_action(obs)] += 1.0 - self.noise
         return probs

@@ -6,32 +6,45 @@ policies work best with which types of partners".
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
+import torch
 
-from adhoc_teamwork.envs.base import TwoAgentEnv
-from adhoc_teamwork.evaluation.rollout import evaluate_pair
+from adhoc_teamwork.envs.vec_env import VecEnv, as_env_fn
+from adhoc_teamwork.evaluation.rollout import run_episodes_batched
 from adhoc_teamwork.policies.nn_agent import NNAgent
 from adhoc_teamwork.population.policy_pool import PolicyPool
 
 
-def build_crossplay_matrix(env: TwoAgentEnv, pool: PolicyPool, n_episodes: int = 5, seed0: int = 1000) -> Dict:
-    """Returns {"names": [...], "matrix": NxN mean-return array (row plays
-    agent-0 slot, column plays agent-1 slot)}.
+def build_crossplay_matrix(
+    env,
+    pool: PolicyPool,
+    n_episodes: int = 5,
+    seed0: int = 1000,
+    column_pool: Optional[PolicyPool] = None,
+    device: torch.device = torch.device("cpu"),
+) -> Dict:
+    """Returns {"names": row names, "column_names": ..., "matrix": mean-return
+    array (row plays agent-0 slot, column plays agent-1 slot), "delivered": ...}.
+
+    ``env`` is a :class:`TwoAgentEnv` or a callable constructing one.
+    ``column_pool`` makes the matrix rectangular (e.g. population x partners);
+    by default the population plays itself.
     """
+    column_pool = column_pool if column_pool is not None else pool
     names: List[str] = pool.names()
-    n = len(names)
-    matrix = np.zeros((n, n), dtype=np.float32)
-    delivered = np.zeros((n, n), dtype=np.float32)
+    column_names: List[str] = column_pool.names()
+    matrix = np.zeros((len(names), len(column_names)), dtype=np.float32)
+    delivered = np.zeros_like(matrix)
+    vec_env = VecEnv(as_env_fn(env), n_episodes)
     for i, name_i in enumerate(names):
-        for j, name_j in enumerate(names):
-            agent_i = NNAgent(pool[name_i])
-            agent_j = NNAgent(pool[name_j])
-            result = evaluate_pair(env, [agent_i, agent_j], n_episodes=n_episodes, seed0=seed0)
-            matrix[i, j] = result["mean_return"]
-            delivered[i, j] = result["mean_delivered"]
-    return {"names": names, "matrix": matrix, "delivered": delivered}
+        for j, name_j in enumerate(column_names):
+            agents = [NNAgent(pool[name_i], device), NNAgent(column_pool[name_j], device)]
+            result = run_episodes_batched(vec_env, agents, seed=seed0)
+            matrix[i, j] = result.returns.mean()
+            delivered[i, j] = result.delivered.mean()
+    return {"names": names, "column_names": column_names, "matrix": matrix, "delivered": delivered}
 
 
 def self_play_vs_cross_play_gap(crossplay_result: Dict) -> Dict:

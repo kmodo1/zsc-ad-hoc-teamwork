@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -60,5 +61,7 @@ class TrajectoryEncoder(nn.Module):
         embedding = self.output_head(new_rnn_state)
         return embedding, new_rnn_state
 
-    def action_to_onehot(self, action: int, device=None) -> torch.Tensor:
-        return F.one_hot(torch.tensor([action], device=device), num_classes=self.num_actions).float()
+    def action_to_onehot(self, action, device=None) -> torch.Tensor:
+        """``action``: an int, or an array of shape (B,). Returns (B, num_actions)."""
+        actions = torch.as_tensor(np.atleast_1d(action), dtype=torch.long, device=device)
+        return F.one_hot(actions, num_classes=self.num_actions).float()

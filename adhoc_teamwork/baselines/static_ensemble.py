@@ -9,43 +9,26 @@ baselines").
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import torch
 
-from adhoc_teamwork.policies.agent_api import Agent
-from adhoc_teamwork.policies.networks import ActorCritic
+from adhoc_teamwork.ensemble.adaptive_ensemble_agent import mix, sub_policy_probs
+from adhoc_teamwork.policies.agent_api import TorchPolicyAgent
 
 
-class StaticEnsembleAgent(Agent):
-    def __init__(
-        self,
-        sub_policies: List[ActorCritic],
-        weights: Optional[np.ndarray] = None,
-        device: torch.device = torch.device("cpu"),
-    ):
+class StaticEnsembleAgent(TorchPolicyAgent):
+    def __init__(self, sub_policies, weights: Optional[np.ndarray] = None, device: torch.device = torch.device("cpu"), argmax_actions: bool = False):
+        super().__init__(device, argmax_actions)
         self.sub_policies = sub_policies
-        self.device = device
         self.weights = weights if weights is not None else np.full(len(sub_policies), 1.0 / len(sub_policies), dtype=np.float32)
         assert len(self.weights) == len(sub_policies)
+        self._weights_t = torch.as_tensor(self.weights, dtype=torch.float32, device=device).unsqueeze(0)
 
-    def reset(self) -> None:
-        self._sub_rnn_states = [p.initial_state(1, self.device) for p in self.sub_policies]
+    def reset(self, batch_size: int = 1) -> None:
+        self._sub_rnn_states = [p.initial_state(batch_size, self.device) for p in self.sub_policies]
 
-    @torch.no_grad()
-    def action_probs(self, obs: np.ndarray) -> np.ndarray:
-        obs_t = torch.as_tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-        combined = np.zeros(self.sub_policies[0].num_actions, dtype=np.float32)
-        for k, policy in enumerate(self.sub_policies):
-            probs, new_state = policy.action_probs(obs_t, self._sub_rnn_states[k])
-            self._sub_rnn_states[k] = new_state
-            combined += self.weights[k] * probs.squeeze(0).cpu().numpy()
-        combined = combined / combined.sum()
-        return combined
-
-    def act(self, obs: np.ndarray, deterministic: bool = False) -> int:
-        probs = self.action_probs(obs)
-        if deterministic:
-            return int(np.argmax(probs))
-        return int(np.random.choice(len(probs), p=probs))
+    def _forward_probs(self, obs_t, available_t):
+        sub_probs = sub_policy_probs(self.sub_policies, self._sub_rnn_states, obs_t, available_t)
+        return mix(self._weights_t.expand(obs_t.shape[0], -1), sub_probs)

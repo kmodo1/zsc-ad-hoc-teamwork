@@ -10,7 +10,7 @@ never need to know which concrete environment they are talking to.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -22,9 +22,11 @@ class StepResult:
     """Result of stepping both agents forward by one timestep."""
 
     obs: np.ndarray  # (NUM_AGENTS, obs_dim)
-    rewards: np.ndarray  # (NUM_AGENTS,) -- fully cooperative: identical shared reward
+    rewards: np.ndarray  # (NUM_AGENTS,) -- the signal to train on (may include per-agent shaping)
     done: bool
     info: Dict
+    # The reward to *report*. None means rewards[0] already is the team reward.
+    team_reward: Optional[float] = None
 
 
 class TwoAgentEnv:
