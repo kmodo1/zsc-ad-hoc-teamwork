@@ -24,7 +24,7 @@ ENSEMBLE_SP_SEEDS = range(1, 9)
 TRAIN_SP_SEEDS = range(9, 16)
 HELDOUT_SP_SEEDS = range(1, 6)  # only held out when the ensemble is not built from self-play
 
-POPULATIONS = ("traj-s10", "mep-s10", "sp8", "s2-mix", "hsp-w1")
+POPULATIONS = ("traj-full10", "traj-s10", "mep-s10", "sp8", "s2-mix", "hsp-w1")
 TRAIN_PARTNER_SETS = ("sp", "sp+biased")
 BASELINE_ALGOS = ("traj", "hsp", "fcp", "mep")
 BASELINE_SEEDS = range(1, 6)
@@ -34,8 +34,13 @@ def population_paths(population: str, layout: str, pool_root: str = None) -> Dic
     """The ensemble's sub-policies (Section 4: "use existing ZSC baselines
     such as TrajDi or FCP" to build the population).
 
-    * ``traj-s10``, ``mep-s10``, ``sp8``: self-play-style agents, diverse with
-      each other but never trained with anyone outside their own population.
+    * ``traj-full10``, ``traj-s10``, ``mep-s10``, ``sp8``: self-play-style agents,
+      diverse with each other but never trained with anyone outside their own
+      population. The pool's ``traj-S1-s10`` folder actually holds 15 members and
+      ``traj-S1-s15`` holds 10 (the MEP folders are correct), so the labels appear
+      swapped. ``traj-full10`` is the whole 10-member population, which is in the
+      folder labeled s15. ``traj-s10`` is members 1-10 of the apparent 15-member one,
+      kept so that earlier results stay reproducible.
     * ``s2-mix``: stage-2 agents of several algorithms, each already trained
       to be robust. The baselines themselves are its members.
     * ``hsp-w1``: specialists, each trained alongside one biased partner.
@@ -47,6 +52,8 @@ def population_paths(population: str, layout: str, pool_root: str = None) -> Dic
         return paths
     if population == "hsp-w1":
         return biased_counterpart_paths(layout, 10, pool_root=pool_root)
+    if population == "traj-full10":
+        return stage1_population_paths(layout, "traj", 15, range(1, 11))  # see the note above
     if population == "traj-s10":
         return stage1_population_paths(layout, "traj", 10, range(1, 11))
     if population == "mep-s10":

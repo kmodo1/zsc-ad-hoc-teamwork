@@ -121,6 +121,18 @@ def main():
                 ref: paired_bootstrap_difference(ours, mean_over_members(scores[ref]), primary) for ref in references if complete_partners(primary, scores[ref])
             }
 
+    # Ablations: the same method and partners, complete encoder minus ablated one.
+    summary["ablations"] = {}
+    for arm in arms:
+        for suffix in ("-memoryless", "-no_partner_action"):
+            base = arm[: -len(suffix)]
+            if not arm.endswith(suffix) or base not in arms:
+                continue
+            for method in ("adaptive_ensemble", "adaptive_ensemble_argmax", "policy_selection"):
+                complete, ablated = scores.get(f"{base}/{method}"), scores.get(f"{arm}/{method}")
+                if complete and ablated and complete_partners(primary, complete) and complete_partners(primary, ablated):
+                    summary["ablations"][f"{arm}/{method}"] = paired_bootstrap_difference(mean_over_members(complete), mean_over_members(ablated), primary)
+
     with open(os.path.join(out, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
 
@@ -135,6 +147,12 @@ def main():
         for family, comparisons in summary["comparisons"].items():
             for ref, c in comparisons.items():
                 print(f"| {family} | {ref} | {c['mean_difference']:+.1f} | [{c['ci95_low']:+.1f}, {c['ci95_high']:+.1f}] | {c['partners_better']}/{c['n_partners']} |")
+
+    if summary["ablations"]:
+        print("\n## Ablations on biased partners (complete encoder - ablated, 95% bootstrap CI over distinct partner agents)\n")
+        print("| ablated run | difference | 95% CI | partners better |\n|---|---:|---|---:|")
+        for family, c in summary["ablations"].items():
+            print(f"| {family} | {c['mean_difference']:+.1f} | [{c['ci95_low']:+.1f}, {c['ci95_high']:+.1f}] | {c['partners_better']}/{c['n_partners']} |")
 
     plot_family_comparison(summary["groups"]["biased"], os.path.join(out, "method_comparison_biased.png"), title=f"{args.layout}: mean return with held-out biased partners")
     for arm in arms:

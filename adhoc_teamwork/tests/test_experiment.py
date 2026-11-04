@@ -53,3 +53,20 @@ def test_specialist_population_never_uses_benchmark_experiments():
     assert len(exps) == 10
     assert not exps & set(_benchmark_exps("unident_s"))
     assert all(p.endswith("_final_w1_actor.pt") for p in names.values())
+
+
+@pytest.mark.parametrize("layout", ["unident_s", "random0_medium"])
+def test_traj_full10_is_a_whole_population(layout):
+    """Guards against the pool's swapped traj-S1-s10 / traj-S1-s15 folder labels."""
+    import os
+
+    from adhoc_teamwork.population.zsceval_pool import default_pool_root
+
+    root = default_pool_root()
+    if not os.path.isdir(os.path.join(root, layout)):
+        pytest.skip("no local policy pool")
+    paths = experiment.population_paths("traj-full10", layout)
+    assert len(paths) == 10
+    assert all(os.path.exists(os.path.join(root, p)) for p in paths.values())
+    folder = os.path.dirname(os.path.join(root, next(iter(paths.values()))))
+    assert len([f for f in os.listdir(folder) if f.endswith("_final_actor.pt")]) == 10
