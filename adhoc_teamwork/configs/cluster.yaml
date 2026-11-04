@@ -1,23 +1,16 @@
-# Larger-scale settings for the real experiments on the UMIACS GPU cluster
-# (Section 4: "If larger GPUs are required, some of our members have access
-# to the UMIACS cluster"). These are starting points, not tuned values --
-# expect to need to retune entropy_coef / lr once the real Overcooked env
-# (via envs/zsceval_adapter.py) replaces the lightweight gridworld.
-population:
-  n_policies: 8           # a real population needs more diverse members
-  n_iterations: 5000
-  episodes_per_iteration: 32
-  horizon: 400
-  hidden_size: 128
-  entropy_coef: 0.02
-
-crossplay:
-  n_episodes: 30
-
+# Settings for the real-Overcooked experiments on the UMIACS cluster. These are
+# what slurm/submit_overcooked.sh passes; results are in the README. Population
+# and partner choices live in experiment.py.
 adaptive_ensemble:
+  advantage: actor_critic
   embed_dim: 32
-  n_iterations: 3000
-  episodes_per_iteration: 16
+  encoder_hidden: 64
+  weighting_hidden: 64
+  n_iterations: 1000
+  episodes_per_iteration: 64
+  partners_per_iteration: 8
+  horizon: 400
+  # about 20 seconds per iteration on one rtxa4000: 5-6 hours per run
 
 evaluation:
-  n_episodes_per_partner: 30
+  n_episodes_per_partner: 20  # in each player position

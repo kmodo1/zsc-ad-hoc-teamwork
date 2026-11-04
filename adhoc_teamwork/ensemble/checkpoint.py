@@ -15,7 +15,14 @@ def load_ensemble_checkpoint(path: str, num_policies: int = None, device: torch.
     in the checkpoint itself and may be smaller than the full population.
     """
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
-    encoder = TrajectoryEncoder(ckpt["obs_dim"], ckpt["num_actions"], hidden_size=ckpt["encoder_hidden"], embed_dim=ckpt["embed_dim"])
+    encoder = TrajectoryEncoder(
+        ckpt["obs_dim"],
+        ckpt["num_actions"],
+        hidden_size=ckpt["encoder_hidden"],
+        embed_dim=ckpt["embed_dim"],
+        use_partner_actions=ckpt.get("use_partner_actions", True),
+        use_memory=ckpt.get("use_memory", True),
+    )
     encoder.load_state_dict(ckpt["encoder_state_dict"])
     weighting_net = WeightingNetwork(ckpt["embed_dim"], len(ckpt["held_in"]), hidden_size=ckpt.get("weighting_hidden", 32))
     weighting_net.load_state_dict(ckpt["weighting_state_dict"])

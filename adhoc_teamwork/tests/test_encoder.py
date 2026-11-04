@@ -1,6 +1,7 @@
 """Unit tests for the partner trajectory encoder (Section 6: "trajectory
 encoders producing valid embeddings")."""
 
+import numpy as np
 import torch
 
 from adhoc_teamwork.encoder.trajectory_encoder import TrajectoryEncoder
@@ -63,3 +64,30 @@ def test_action_to_onehot():
     assert onehot.shape == (1, NUM_ACTIONS)
     assert onehot.sum().item() == 1.0
     assert onehot[0, 2].item() == 1.0
+
+
+def test_no_partner_action_ablation_ignores_partner_actions():
+    enc = TrajectoryEncoder(OBS_DIM, NUM_ACTIONS, use_partner_actions=False)
+    obs = torch.randn(2, OBS_DIM)
+    state = enc.initial_state(2)
+    a, _ = enc.step(obs, enc.action_to_onehot(np.array([0, 1])), state)
+    b, _ = enc.step(obs, enc.action_to_onehot(np.array([2, 3])), state)
+    assert torch.allclose(a, b)
+
+
+def test_memoryless_ablation_depends_only_on_the_current_observation():
+    enc = TrajectoryEncoder(OBS_DIM, NUM_ACTIONS, use_partner_actions=False, use_memory=False)
+    obs = torch.randn(1, OBS_DIM)
+    fresh, _ = enc.step(obs, enc.initial_partner_action(1), enc.initial_state(1))
+    after_history, _ = enc.step(obs, enc.action_to_onehot(3), torch.randn(1, enc.hidden_size))
+    assert torch.allclose(fresh, after_history)
+
+
+def test_full_encoder_does_use_memory_and_partner_actions():
+    enc = TrajectoryEncoder(OBS_DIM, NUM_ACTIONS)
+    obs = torch.randn(1, OBS_DIM)
+    base, _ = enc.step(obs, enc.action_to_onehot(0), enc.initial_state(1))
+    other_action, _ = enc.step(obs, enc.action_to_onehot(3), enc.initial_state(1))
+    other_memory, _ = enc.step(obs, enc.action_to_onehot(0), torch.randn(1, enc.hidden_size))
+    assert not torch.allclose(base, other_action)
+    assert not torch.allclose(base, other_memory)

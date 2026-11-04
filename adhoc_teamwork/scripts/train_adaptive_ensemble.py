@@ -75,6 +75,12 @@ def main():
     parser.add_argument("--embed-dim", type=int, default=16)
     parser.add_argument("--encoder-hidden", type=int, default=32)
     parser.add_argument("--weighting-hidden", type=int, default=32)
+    parser.add_argument(
+        "--encoder-ablation",
+        choices=["none", "no_partner_action", "memoryless"],
+        default="none",
+        help="no_partner_action: hide the partner's actions from the encoder. memoryless: also remove its memory, so weights depend only on the current state.",
+    )
     parser.add_argument("--advantage", choices=["reinforce", "actor_critic"], default="reinforce")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-entropy-coef", type=float, default=0.01)
@@ -99,6 +105,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     with open(f"{args.out}/config.json", "w") as f:
         json.dump(vars(args), f, indent=2)
+    encoder_kwargs = {"use_partner_actions": args.encoder_ablation == "none", "use_memory": args.encoder_ablation != "memoryless"}
     t0 = time.time()
     encoder, weighting_net, stats = train_adaptive_ensemble(
         env,
@@ -116,6 +123,7 @@ def main():
         verbose=not args.quiet,
         log_every=max(1, args.n_iterations // 100),
         checkpoint_path=f"{args.out}/train_state.pt",
+        encoder_kwargs=encoder_kwargs,
     )
     torch.save(
         {
@@ -124,6 +132,7 @@ def main():
             "held_in": held_in,
             "embed_dim": args.embed_dim,
             "encoder_hidden": encoder.hidden_size,
+            **encoder_kwargs,
             "weighting_hidden": args.weighting_hidden,
             "obs_dim": encoder.obs_dim,
             "num_actions": encoder.num_actions,

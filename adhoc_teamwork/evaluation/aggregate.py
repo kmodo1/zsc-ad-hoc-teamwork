@@ -79,18 +79,31 @@ def group_summary(scores: Dict[str, List[float]], partners: Sequence[str]) -> Di
     }
 
 
+def partner_cluster(partner: str) -> str:
+    """``bias3_mid`` and ``bias3_final`` are two checkpoints of one agent."""
+    return re.sub(r"_(init|mid|final)$", "", partner)
+
+
 def paired_bootstrap_difference(a: Dict[str, float], b: Dict[str, float], partners: Sequence[str], n_boot: int = 10000, seed: int = 0) -> Dict[str, float]:
-    """Mean of a - b over partners, with a percentile bootstrap CI over partners."""
-    diffs = np.array([a[p] - b[p] for p in partners])
+    """Mean of a - b over partners, with a percentile bootstrap CI. Resamples
+    distinct agents rather than checkpoints, which are not independent and
+    would make the interval too narrow.
+    """
+    clusters: Dict[str, List[float]] = {}
+    for p in partners:
+        clusters.setdefault(partner_cluster(p), []).append(a[p] - b[p])
+    cluster_diffs = np.array([np.mean(v) for v in clusters.values()])
     rng = np.random.default_rng(seed)
-    resampled = diffs[rng.integers(0, len(diffs), size=(n_boot, len(diffs)))].mean(axis=1)
+    resampled = cluster_diffs[rng.integers(0, len(cluster_diffs), size=(n_boot, len(cluster_diffs)))].mean(axis=1)
     low, high = np.percentile(resampled, [2.5, 97.5])
+    diffs = np.array([a[p] - b[p] for p in partners])
     return {
         "mean_difference": float(diffs.mean()),
         "ci95_low": float(low),
         "ci95_high": float(high),
         "partners_better": int((diffs > 0).sum()),
         "n_partners": int(len(diffs)),
+        "n_independent_partners": int(len(clusters)),
     }
 
 

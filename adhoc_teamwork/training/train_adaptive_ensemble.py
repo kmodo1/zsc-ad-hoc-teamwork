@@ -214,6 +214,7 @@ def train_adaptive_ensemble(
     log_every: int = 10,
     checkpoint_path: Optional[str] = None,
     checkpoint_every: int = 25,
+    encoder_kwargs: Optional[dict] = None,
 ):
     """Trains encoder + weighting network. Sub-policies are frozen (their
     parameters receive no gradient). ``env`` is a :class:`TwoAgentEnv` or a
@@ -235,7 +236,7 @@ def train_adaptive_ensemble(
     vec_env = VecEnv(as_env_fn(env), episodes_per_iteration)
     obs_dim = sub_policies[0].obs_dim
     num_actions = sub_policies[0].num_actions
-    encoder = TrajectoryEncoder(obs_dim, num_actions, hidden_size=encoder_hidden, embed_dim=embed_dim).to(device)
+    encoder = TrajectoryEncoder(obs_dim, num_actions, hidden_size=encoder_hidden, embed_dim=embed_dim, **(encoder_kwargs or {})).to(device)
     weighting_net = WeightingNetwork(embed_dim, len(sub_policies), hidden_size=weighting_hidden).to(device)
     value_head = nn.Linear(embed_dim, 1).to(device)
     params = list(encoder.parameters()) + list(weighting_net.parameters()) + list(value_head.parameters())

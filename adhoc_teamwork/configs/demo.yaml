@@ -1,7 +1,6 @@
 # Fast-running settings used to produce results/ in this repository and in
 # CI. Suitable for a laptop CPU in a few minutes; not meant to produce a
-# fully-converged population. See configs/cluster.yaml for the scale we
-# intend to run on the UMIACS cluster for the real experiments.
+# fully-converged population. See configs/cluster.yaml for the real experiments.
 population:
   n_policies: 3
   n_iterations: 250

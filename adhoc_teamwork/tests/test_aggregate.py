@@ -59,6 +59,18 @@ def test_paired_bootstrap_detects_consistent_difference_and_not_a_lucky_one():
     assert lucky["ci95_low"] == 0.0, "a difference from one partner must not look significant"
 
 
+def test_bootstrap_resamples_agents_not_their_checkpoints():
+    # Two agents, one with a large difference at both checkpoints. Treating the
+    # four checkpoints as independent would understate the uncertainty.
+    partners = ["bias1_mid", "bias1_final", "bias2_mid", "bias2_final"]
+    a = {"bias1_mid": 10.0, "bias1_final": 10.0, "bias2_mid": 0.0, "bias2_final": 0.0}
+    b = {p: 0.0 for p in partners}
+    result = paired_bootstrap_difference(a, b, partners)
+    assert result["n_independent_partners"] == 2
+    assert result["n_partners"] == 4
+    assert result["ci95_low"] == 0.0 and result["ci95_high"] == 10.0
+
+
 def test_benchmark_covers_both_positions_and_resumes(tmp_path):
     vec_env = VecEnv(lambda: OvercookedGridworld(horizon=5), 2)
     out = str(tmp_path / "results.jsonl")

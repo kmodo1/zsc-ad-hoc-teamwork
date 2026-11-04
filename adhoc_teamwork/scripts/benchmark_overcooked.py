@@ -77,6 +77,7 @@ def main():
     parser.add_argument("--layout", required=True)
     parser.add_argument("--population", default="traj-s10", choices=experiment.POPULATIONS)
     parser.add_argument("--ensemble", default=None, help="checkpoint from train_adaptive_ensemble (for --what ensemble)")
+    parser.add_argument("--argmax-actions", action="store_true", help="baselines take their most probable action, to compare like for like with the argmax ensemble")
     parser.add_argument("--pool-root", default=default_pool_root())
     parser.add_argument("--n-episodes", type=int, default=20, help="episodes per (method, partner, position)")
     parser.add_argument("--seed", type=int, default=0)
@@ -97,7 +98,7 @@ def main():
     methods = {}
     if args.what == "baselines":
         baseline_pool = load(experiment.baseline_paths(args.layout))
-        methods = {name: functools.partial(NNAgent, baseline_pool[name], device) for name in baseline_pool.names()}
+        methods = {name: functools.partial(NNAgent, baseline_pool[name], device, argmax_actions=args.argmax_actions) for name in baseline_pool.names()}
     else:
         population_pool = load(experiment.population_paths(args.population, args.layout, args.pool_root))
         sub_policies = [population_pool[name] for name in population_pool.names()]

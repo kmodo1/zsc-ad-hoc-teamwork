@@ -25,8 +25,15 @@ import torch.nn.functional as F
 
 
 class TrajectoryEncoder(nn.Module):
-    def __init__(self, obs_dim: int, num_actions: int, hidden_size: int = 32, embed_dim: int = 16):
+    def __init__(self, obs_dim: int, num_actions: int, hidden_size: int = 32, embed_dim: int = 16, use_partner_actions: bool = True, use_memory: bool = True):
+        """The two flags exist for ablations, testing whether a benefit really
+        comes from observing the partner over time. Without either, the output
+        can only depend on the current state: any gain left is state-based
+        gating between sub-policies, not partner modeling.
+        """
         super().__init__()
+        self.use_partner_actions = use_partner_actions
+        self.use_memory = use_memory
         self.obs_dim = obs_dim
         self.num_actions = num_actions
         self.hidden_size = hidden_size
@@ -55,6 +62,10 @@ class TrajectoryEncoder(nn.Module):
 
         Returns (embedding (B, embed_dim), new_rnn_state (B, hidden_size)).
         """
+        if not self.use_partner_actions:
+            prev_partner_action_onehot = torch.zeros_like(prev_partner_action_onehot)
+        if not self.use_memory:
+            rnn_state = torch.zeros_like(rnn_state)
         x = torch.cat([ego_obs, prev_partner_action_onehot], dim=-1)
         x = self.input_proj(x)
         new_rnn_state = self.gru(x, rnn_state)

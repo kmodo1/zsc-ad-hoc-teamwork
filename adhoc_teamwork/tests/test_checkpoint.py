@@ -49,3 +49,25 @@ def test_load_checkpoint_with_held_in_subset_of_population(tmp_path):
     loaded_encoder, loaded_weighting_net, held_in_names = load_ensemble_checkpoint(str(ckpt_path))
     assert held_in_names == ["policy_0", "policy_1"]
     assert loaded_weighting_net.num_policies == 2
+
+
+def test_checkpoint_restores_encoder_ablation_flags(tmp_path):
+    import torch as _torch
+
+    from adhoc_teamwork.encoder.trajectory_encoder import TrajectoryEncoder
+    from adhoc_teamwork.ensemble.checkpoint import load_ensemble_checkpoint
+    from adhoc_teamwork.ensemble.weighting_network import WeightingNetwork
+
+    enc = TrajectoryEncoder(4, 2, hidden_size=8, embed_dim=4, use_partner_actions=False, use_memory=False)
+    net = WeightingNetwork(4, 2, hidden_size=8)
+    path = str(tmp_path / "e.pt")
+    _torch.save(
+        {
+            "encoder_state_dict": enc.state_dict(), "weighting_state_dict": net.state_dict(), "held_in": ["a", "b"],
+            "embed_dim": 4, "encoder_hidden": 8, "weighting_hidden": 8, "obs_dim": 4, "num_actions": 2,
+            "use_partner_actions": False, "use_memory": False,
+        },
+        path,
+    )  # fmt: skip
+    loaded, _, _ = load_ensemble_checkpoint(path)
+    assert loaded.use_partner_actions is False and loaded.use_memory is False

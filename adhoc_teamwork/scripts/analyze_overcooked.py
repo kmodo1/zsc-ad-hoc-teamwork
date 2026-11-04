@@ -63,6 +63,10 @@ def main():
     if os.path.exists(baselines_path):
         tables.append(load_table(baselines_path))
     scores = family_partner_scores(tables)
+    argmax_baselines_path = os.path.join(layout_dir, "baselines_argmax", "results.jsonl")
+    if os.path.exists(argmax_baselines_path):
+        for family, family_scores in family_partner_scores([load_table(argmax_baselines_path)]).items():
+            scores[f"{family}_argmax"] = family_scores
     scores["oracle_best_sub_policy"] = {p: [v] for p, v in oracle_best_sub_policy(population_table).items()}
     fixed = best_fixed_sub_policy(population_table, partner_groups["biased"])
     scores["best_fixed_sub_policy"] = {p: [v] for p, v in fixed.items()}
@@ -76,6 +80,16 @@ def main():
                 family = scores.setdefault(f"{arm}/{method}", {})
                 for partner, value in partners.items():
                     family.setdefault(partner, []).append(value)
+            # The sub-policy training favored most. Unlike best_fixed_sub_policy,
+            # this choice uses no evaluation results, so it is a fair comparison.
+            weights_path = os.path.join(os.path.dirname(path), "learned_static_weights.json")
+            if os.path.exists(weights_path):
+                with open(weights_path) as f:
+                    weights = json.load(f)
+                top = [m for m in population_table if m.startswith("sub_")][int(np.argmax(weights))]
+                family = scores.setdefault(f"{arm}/top_learned_sub_policy", {})
+                for partner, value in population_table[top].items():
+                    family.setdefault(partner, []).append(value)
 
     summary = {"layout": args.layout, "population": args.population, "groups": {}, "comparisons": {}}
     for group, partners in partner_groups.items():
@@ -86,7 +100,13 @@ def main():
     # than its two ablations and than each baseline, across biased partners?
     primary = partner_groups["biased"]
     reference_families = [
-        f for f in ("static_ensemble", "static_ensemble_argmax", "single_sub_policy", "best_fixed_sub_policy", "mappo", "traj_s36", "hsp_s36", "fcp_s36", "mep_s36", "oracle_best_sub_policy") if f in scores
+        f
+        for f in (
+            "static_ensemble", "static_ensemble_argmax", "single_sub_policy", "best_fixed_sub_policy", "oracle_best_sub_policy",
+            "mappo", "traj_s36", "hsp_s36", "fcp_s36", "mep_s36",
+            "mappo_argmax", "traj_s36_argmax", "hsp_s36_argmax", "fcp_s36_argmax", "mep_s36_argmax",
+        )  # fmt: skip
+        if f in scores
     ]
     for arm in arms:
         learned_static = f"{arm}/learned_static_ensemble"
@@ -95,7 +115,7 @@ def main():
             if family not in scores or not complete_partners(primary, scores[family]):
                 continue
             ours = mean_over_members(scores[family])
-            references = [learned_static] if method != "learned_static_ensemble" and learned_static in scores else []
+            references = [learned_static, f"{arm}/top_learned_sub_policy"] if method != "learned_static_ensemble" and learned_static in scores else []
             references += reference_families
             summary["comparisons"][family] = {
                 ref: paired_bootstrap_difference(ours, mean_over_members(scores[ref]), primary) for ref in references if complete_partners(primary, scores[ref])
@@ -110,7 +130,7 @@ def main():
         for family, row in rows.items():
             print(f"| {family} | {row['mean']:.1f} | {row['std_across_seeds']:.1f} | {row['n_seeds']} |")
     if summary["comparisons"]:
-        print("\n## Differences on biased partners (ours - reference, 95% bootstrap CI over partners)\n")
+        print("\n## Differences on biased partners (ours - reference, 95% bootstrap CI over distinct partner agents)\n")
         print("| ours | reference | difference | 95% CI | partners better |\n|---|---|---:|---|---:|")
         for family, comparisons in summary["comparisons"].items():
             for ref, c in comparisons.items():

@@ -14,4 +14,5 @@ the current (possibly unseen) partner.
   [sjtu-marl/ZSC-Eval](https://github.com/sjtu-marl/ZSC-Eval) that the
   proposal builds on (real Overcooked environment, baseline ZSC
   algorithms). Requires its own Python 3.9 / `gym==0.22` / `numpy==1.22`
-  environment -- see `ZSC-Eval/README.md`.
+  environment -- see `ZSC-Eval/README.md`. `adhoc_teamwork/` runs on it through
+  an adapter validated against ZSC-Eval's published benchmark results.
