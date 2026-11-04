@@ -193,94 +193,134 @@ wrappers and rollout code reproduces its numbers: mean return 258.8 vs. 258.5
 published on `unident_s` (r = 0.997 over 240 pairings) and 119.4 vs. 119.5 on
 `random0_medium` (r = 0.995 over 240 pairings).
 
-**Main comparison.** Three populations, each with a weighting network trained for
-1000 iterations with an actor-critic estimator, on 3 seeds. Baselines have 5 seeds.
-`traj-s10` is members 1-10 of a TrajeDi stage-1 population, taken from the pool's
-`traj-S1-s10` folder, with the weighting network trained against self-play partners
-only. That folder actually holds 15 members and `traj-S1-s15` holds 10, in the public
-pool too, so those two labels appear to be swapped. `s2-mix` is 12 stage-2 agents (3 seeds each of TrajeDi,
-HSP, FCP, MEP). `hsp-w1` is 10 specialists, each co-trained with one biased agent
-outside the benchmark set. Those two trained against self-play partners plus
-biased agents outside the benchmark set: never the evaluation partners, but from
-the same generator, so that is a weaker test of generalization. Runs of `hsp-w1`
-against self-play partners only are in progress.
+**The populations.** Each ensemble combines one of three populations, with a weighting
+network trained for 1000 iterations with an actor-critic estimator, on 3 seeds.
+Baselines have 5 seeds.
 
-Every method was run both ways: sampling its action, or taking the most probable
-one (argmax, which is how Section 4 describes the ensemble). Compare within a column.
+- `traj-full10`: a whole 10-member TrajeDi stage-1 population. Each member trained in
+  self-play with a bonus for differing from the others, and never with anyone else.
+- `s2-mix`: 12 stage-2 agents (3 seeds each of TrajeDi, HSP, FCP, MEP). These are the
+  baselines themselves, each already trained to work with many partners.
+- `hsp-w1`: 10 specialists, each the teammate co-trained with one biased agent outside
+  the benchmark set.
+
+Unless noted, `traj-full10` trained against self-play partners, and `s2-mix` and
+`hsp-w1` against self-play partners plus biased agents outside the benchmark set. Those
+biased agents are never evaluation partners, but they come from the same generator, so
+that is a weaker test of generalization (see **Training partners** below).
+
+Every method ran both ways: sampling its action, or taking the most probable one
+(argmax, which is how Section 4 describes the ensemble). Compare within a column.
 
 | Layout | Population | Uniform, sampled | Adaptive, sampled | Uniform, argmax | Adaptive, argmax |
 |---|---|---:|---:|---:|---:|
-| `unident_s` | `traj-s10` | 176.6 | 175.5 | 176.2 | 176.4 |
+| `unident_s` | `traj-full10` | 175.9 | 174.5 | 171.2 | 176.7 |
 | | `s2-mix` | 297.1 | 301.2 | 316.9 | **321.0** |
 | | `hsp-w1` | 192.8 | 267.6 | 236.0 | 269.0 |
 | | *Best baseline (MEP)* | | *305.6* | | *308.6* |
-| `random0_medium` | `traj-s10` | 108.7 | 143.5 | 127.7 | 148.2 |
+| `random0_medium` | `traj-full10` | 90.9 | 140.8 | 115.0 | 142.8 |
 | | `s2-mix` | 112.5 | 140.6 | 156.4 | **162.3** |
 | | `hsp-w1` | 97.2 | 142.8 | 115.2 | 152.7 |
 | | *Best baseline (HSP)* | | *134.3* | | *140.8* |
 
-**Adaptive against uniform weights, same population.** It helps in most cases, by
-an amount that depends heavily on the population:
+**Adaptive against uniform weights, same population.** It helps in most cases, by an
+amount that depends heavily on the population:
 
 | Layout | Population | Sampled | Argmax |
 |---|---|---:|---:|
-| `unident_s` | `traj-s10` | -1.1 [-3.1, +0.1] | +0.2 [-0.8, +1.2] |
+| `unident_s` | `traj-full10` | -1.3 [-4.4, +0.7] | +5.5 [-0.4, +13.7] |
 | | `s2-mix` | +4.1 [+2.2, +5.9] | +4.1 [-2.6, +12.1] |
 | | `hsp-w1` | +74.8 [+57.6, +94.9] | +33.0 [+6.5, +52.9] |
-| `random0_medium` | `traj-s10` | +34.8 [+19.4, +51.5] | +20.6 [+7.9, +34.3] |
+| `random0_medium` | `traj-full10` | +49.9 [+28.3, +73.9] | +27.7 [+5.7, +51.3] |
 | | `s2-mix` | +28.1 [+22.4, +34.3] | +6.0 [+0.8, +11.4] |
 | | `hsp-w1` | +45.6 [+21.3, +74.5] | +37.5 [+11.7, +68.6] |
 
-**Against the best baseline, like for like.** Only `s2-mix` with argmax actions beats
-it on both layouts: +12.4 [+5.1, +20.7] on `unident_s` and +21.6 [+11.1, +30.8] on
-`random0_medium`. Most of that does not come from adaptation. The same ensemble with
-*uniform* weights and argmax actions already gets +8.3 [-4.9, +20.5] and
-+15.6 [+0.9, +29.2], and adapting adds only the argmax differences in the table above.
+**Adaptive against the best baseline, like for like.**
 
-`hsp-w1` shows the largest benefit from adapting and comes closest to the best
-per-partner choice of its members (below). But it is below every stage-2 baseline on
-`unident_s` (-22.9 to -37.9 sampled) and not clearly above HSP on `random0_medium`
-(+8.5 [-4.5, +20.3] sampled, +12.0 [-2.7, +25.4] argmax). `traj-s10` is limited by
-its members on `unident_s`, where the best per-partner choice reaches only 184.6.
-
-| Layout | Population | Best single member, in hindsight | Best member per partner, in hindsight |
+| Layout | Population | Sampled | Argmax |
 |---|---|---:|---:|
-| `unident_s` | `traj-s10` | 178.2 | 184.6 |
+| `unident_s` | `traj-full10` | -131.0 [-183.5, -78.4] | -131.9 [-185.3, -78.4] |
+| | `s2-mix` | -4.4 [-5.9, -3.0] | **+12.4 [+5.1, +20.7]** |
+| | `hsp-w1` | -37.9 [-59.6, -19.8] | -39.6 [-64.5, -18.1] |
+| `random0_medium` | `traj-full10` | +6.5 [-10.5, +21.3] | +2.0 [-13.8, +15.4] |
+| | `s2-mix` | +6.3 [-1.1, +13.2] | **+21.6 [+11.1, +30.8]** |
+| | `hsp-w1` | +8.5 [-4.5, +20.3] | +12.0 [-2.7, +25.4] |
+
+Only `s2-mix` with argmax beats the best baseline on both layouts, and most of that does
+not come from adaptation. The same ensemble with *uniform* weights and argmax already
+gets +8.3 [-4.9, +20.5] and +15.6 [+0.9, +29.2], and with no memory it scores 317.7 and
+160.8.
+
+**Is the gain from observing the partner's trajectory?** The encoder ablations test this.
+Each row is the complete encoder minus an ablated one, so a positive number means the
+removed part helped:
+
+| Layout | Population | No memory, sampled | No memory, argmax | Partner actions hidden, sampled | Partner actions hidden, argmax |
+|---|---|---:|---:|---:|---:|
+| `unident_s` | `hsp-w1` | +35.1 [+15.9, +55.3] | +2.3 [-24.6, +28.6] | +0.8 [-3.9, +6.3] | -2.2 [-12.5, +9.1] |
+| | `s2-mix` | +2.8 [+1.4, +4.1] | +3.3 [-2.5, +10.0] | not run | not run |
+| `random0_medium` | `hsp-w1` | +6.9 [+3.8, +10.2] | +7.8 [+3.4, +12.3] | -0.1 [-1.8, +1.2] | +0.2 [-1.6, +1.8] |
+| | `s2-mix` | +6.9 [+4.1, +10.1] | +1.6 [-0.6, +4.0] | not run | not run |
+| | `traj-full10` | +4.2 [+1.4, +7.2] | -1.6 [-7.6, +3.6] | +0.7 [-1.5, +3.5] | -2.7 [-3.9, -1.6] |
+
+- **`hsp-w1` shows real partner adaptation.** Compare
+  `results/overcooked/unident_s/hsp-w1/weight_traces_actor_critic-sp+biased.png` with
+  the `-memoryless` version. With memory, the weights split by partner within about the
+  first 50 steps, and the two checkpoints of one agent tend to go the same way. Without
+  memory, all 20 panels look almost the same (std between partners 0.065 vs. 0.010 on
+  `unident_s`). `s2-mix` and `traj-full10` show less of this on both layouts (0.009-0.035,
+  against 0.047-0.065 for `hsp-w1`), which fits members not specialized to partner styles.
+- **Memory helps, but is not most of the gain.** Where the gain over uniform weights is
+  sizeable, the no-memory version keeps 53-92% of it with sampled actions and 73% or more
+  with argmax. So much of the benefit is gating between sub-policies on the current
+  state, which does include the partner's position and held item.
+- **The partner's action input adds nothing measurable.** Hiding it makes no detectable
+  difference in five of six comparisons and slightly helps in the sixth. This does not
+  mean information about the partner is useless: weights still split by partner without
+  it (std 0.064), since memory can infer behavior from the observations.
+
+**Training partners.** The `hsp-w1` results above depend on the training partners
+resembling the evaluation partners. Trained against self-play partners only, the gain on
+`unident_s` mostly disappears, which is the risk Section 9 warns about. It holds up
+better on `random0_medium`.
+
+| Layout | Trained against | Adaptive, sampled | Against uniform | Adaptive, argmax | Against uniform |
+|---|---|---:|---:|---:|---:|
+| `unident_s` | Self-play only | 222.2 | +29.4 [-1.3, +62.7] | 216.2 | -19.9 [-46.3, +6.3] |
+| | Self-play + other biased agents | 267.6 | +74.8 [+57.6, +94.9] | 269.0 | +33.0 [+6.5, +52.9] |
+| `random0_medium` | Self-play only | 138.5 | +41.3 [+13.5, +74.7] | 142.9 | +27.7 [+0.0, +60.3] |
+| | Self-play + other biased agents | 142.8 | +45.6 [+21.3, +74.5] | 152.7 | +37.5 [+11.7, +68.6] |
+
+**What each population could reach by choosing among its members, in hindsight:**
+
+| Layout | Population | Best single member | Best member per partner |
+|---|---|---:|---:|
+| `unident_s` | `traj-full10` | 176.6 | 182.0 |
 | | `s2-mix` | 310.2 | 323.0 |
 | | `hsp-w1` | 217.7 | 278.7 |
-| `random0_medium` | `traj-s10` | 139.3 | 150.0 |
+| `random0_medium` | `traj-full10` | 125.5 | 140.5 |
 | | `s2-mix` | 148.9 | 156.7 |
 | | `hsp-w1` | 115.4 | 154.6 |
 
-The per-partner figure is a reference rather than a strict bound, since switching
-within an episode can beat it. On `random0_medium`, `s2-mix` with argmax scores above
-it, though within noise (162.3 vs. 156.7, +5.6 [-3.9, +14.5]).
+The per-partner figure is a reference rather than a strict bound, since switching within
+an episode can beat it. On `random0_medium`, `traj-full10` and `s2-mix` with argmax score
+above it, though within noise (+2.3 [-6.1, +11.5] and +5.6 [-3.9, +14.5]). On `unident_s`,
+TrajeDi members are limited both by this and by being mutually compatible, with almost no self-play/cross-play gap
+(479.1 vs. 472.1, against 253.1 vs. 147.9 on `random0_medium`), so there is little to
+choose between.
 
-**Is the gain from observing the partner's trajectory?** So far this has only been
-tested on `random0_medium` with `traj-s10`, and there the answer is mostly no. Removing
-the encoder's memory leaves weights depending only on the current state, and keeps most
-of the gain over fixed weights. Hiding the partner's actions changes nothing measurable.
+**Argmax beats sampling for ensembles.** Sampling from a mixture of incompatible policies
+produces incoherent behavior. Taking the mixture's most probable action is better for every
+population with uniform weights on `random0_medium` (e.g. 112.5 vs. 156.4 for `s2-mix`),
+while it barely changes the stage-2 baselines (at most 6.4 for any family) and makes MAPPO
+worse (-14.3 on `unident_s`, -4.8 on `random0_medium`). Section 4's choice of argmax was
+the right one for the ensemble.
 
-| Encoder | Sampled | Argmax |
-|---|---:|---:|
-| Complete | 143.5 | 148.2 |
-| Partner's actions hidden | 143.3 (difference +0.2 [-0.6, +1.0]) | 147.2 (+1.0 [-0.8, +3.6]) |
-| No memory or partner actions | 138.7 (+4.9 [+2.5, +7.2]) | 146.5 (+1.8 [+0.5, +3.0]) |
-| *Learned fixed weights, for reference* | *127.2* | |
-
-So memory adds a small real gain, while most of the benefit looks like gating between
-sub-policies on the current game state. That state does include the partner's position
-and held item, so it is reacting to the partner, but not modeling their behavior over
-time. The same ablations for `hsp-w1` and `s2-mix` are in progress. `hsp-w1` matters
-most: its weights differ most between partners (std 0.065 between partners on
-`unident_s`, against 0.006 for `traj-s10`).
-
-**Argmax beats sampling for ensembles.** Sampling from a mixture of incompatible
-policies produces incoherent behavior. Taking the mixture's most probable action is
-better for every population with uniform weights on `random0_medium` (e.g. 112.5 vs.
-156.4 for `s2-mix`), while it barely changes the stage-2 baselines (at most 6.4 for
-any family) and makes MAPPO worse (-14.3 on `unident_s`, -4.8 on `random0_medium`).
-Section 4's choice of argmax was the right one for the ensemble.
+**A note on `traj-s10`.** The pool's `traj-S1-s10` folder actually holds 15 members and
+`traj-S1-s15` holds 10, in the public pool too, so those labels appear to be swapped.
+`traj-s10` is members 1-10 of the apparent 15-member population, used before this was
+noticed, and `traj-full10` is the real 10-member one. Both lead to the same conclusions,
+and `traj-s10`'s results are kept in `results/overcooked/`.
 
 ## Status against the proposal
 
@@ -294,9 +334,6 @@ Not done:
   trained in this repository for real Overcooked. `scripts/train_population.py` and
   `training/ppo_trainer.py` are gridworld-only. ZSC-Eval's trainers would be the way
   to train new ones.
-- **Ablations and self-play-only training for `hsp-w1` and `s2-mix`** are in progress.
-- **`traj-full10`**, the whole 10-member TrajeDi population, is in progress as the
-  replacement for `traj-s10` (see the note on folder labels under **Results**).
 - **The REINFORCE arm.** `--advantage reinforce` is implemented and tested but has not
   been run at scale on real Overcooked, so actor-critic has not been compared with it.
 - **More layouts and seeds.** Only two layouts, three training seeds.
