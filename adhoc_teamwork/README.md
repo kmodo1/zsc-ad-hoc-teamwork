@@ -93,7 +93,7 @@ real, larger-scale runs on the UMIACS cluster.
 pip install pytest
 pytest adhoc_teamwork/tests -q
 ```
-88 unit + integration tests (25 of them need the `zsceval` environment and
+95 unit + integration tests (29 of them need the `zsceval` environment and
 skip themselves without it, and some of those also need a policy pool) cover:
 the real-Overcooked adapter's contract and the ZSC-Eval policy wrapper;
 that evaluation partners are disjoint from training partners and sub-policies;
@@ -177,6 +177,32 @@ export WANDB_PROJECT=<your project>
 `submit_overcooked.sh` then also starts `scripts/sync_wandb.py`. It only reads
 files the jobs already write, so training has no dependency on wandb.
 
+## Running real Overcooked locally
+
+The cluster is not needed for evaluation or the tests. On a Linux or WSL machine with
+[uv](https://docs.astral.sh/uv/), from the repository root:
+
+```bash
+uv venv --python 3.9 --seed venv
+grep -v '^-e' ZSC-Eval/requirements.txt > /tmp/requirements.txt
+uv pip install --python venv/bin/python "setuptools<66" "wheel<0.40"
+uv pip install --python venv/bin/python --index-strategy unsafe-best-match \
+    --extra-index-url https://download.pytorch.org/whl/cu128 \
+    "torch==2.8.0+cu128" "torchvision==0.23.0+cu128" -r /tmp/requirements.txt pytest pyyaml matplotlib
+export PYTHONPATH=$PWD:$PWD/ZSC-Eval OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+```
+
+This uses CUDA 12.8 rather than the 11.8 in `environment.yml`, for newer GPUs. Replaying the
+validation this way matches the cluster's run closely (r = 1.000 over 240 pairings on each
+layout, mean absolute difference 0.15).
+
+Use `--device cpu` for evaluation, and run several jobs at once instead. One cell of 20
+episodes took 2.8 s on CPU against 4.8 s on an RTX 5080 for a single policy, and 6.6 s against
+12.5 s for a 12-member ensemble: the networks are small and each step moves a small batch, so
+transfers outweigh any speedup, and the environment itself is Python on the CPU. Training was
+not timed. Add `--partner-groups biased` to `benchmark_overcooked` for just the primary
+comparison.
+
 ## Results
 
 Everything below is on real Overcooked, against ZSC-Eval's 20 held-out biased
@@ -191,7 +217,8 @@ only shows that the pipeline runs.
 **Validation.** Replaying ZSC-Eval's published pairings through our adapter,
 wrappers and rollout code reproduces its numbers: mean return 258.8 vs. 258.5
 published on `unident_s` (r = 0.997 over 240 pairings) and 119.4 vs. 119.5 on
-`random0_medium` (r = 0.995 over 240 pairings).
+`random0_medium` (r = 0.995 over 240 pairings). A second replay on different hardware gives
+the same result (see **Running real Overcooked locally**).
 
 **The populations.** Each ensemble combines one of three populations, with a weighting
 network trained for 1000 iterations with an actor-critic estimator, on 3 seeds.
@@ -389,6 +416,12 @@ MAPPO baselines are ZSC-Eval's own trained agents, so they are at full fidelity.
 
 Not done:
 
+- **Training with the action rule Section 4 describes.** The weighting network trains by
+  sampling from the mixture (`training/train_adaptive_ensemble.py`), but Section 4's method
+  takes the argmax, so argmax results use weights tuned for sampled behavior. Its effect
+  has not been measured.
+- **Policy selection with argmax.** It has only run with sampled actions, so it should
+  not be compared with the argmax ensembles.
 - **Population training.** All policies come from a pre-trained pool; none have been
   trained in this repository for real Overcooked. `scripts/train_population.py` and
   `training/ppo_trainer.py` are gridworld-only. ZSC-Eval's trainers would be the way
