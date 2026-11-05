@@ -3,8 +3,9 @@
 
 Three kinds of method, split so each is only evaluated as often as needed:
 
-  --what population   each sub-policy alone, and the uniform static ensemble
-                      (once per layout and population). The per-partner best
+  --what population   each sub-policy alone and the uniform static ensemble,
+                      each sampling and with argmax actions (once per layout
+                      and population). The per-partner best
                       sub-policy shows what perfect per-partner selection from
                       this population would achieve. It is a reference rather
                       than a strict bound: switching within an episode could
@@ -78,6 +79,7 @@ def main():
     parser.add_argument("--population", default="traj-s10", choices=experiment.POPULATIONS)
     parser.add_argument("--ensemble", default=None, help="checkpoint from train_adaptive_ensemble (for --what ensemble)")
     parser.add_argument("--argmax-actions", action="store_true", help="baselines take their most probable action, to compare like for like with the argmax ensemble")
+    parser.add_argument("--partner-groups", nargs="+", default=None, help="evaluate only these partner groups, e.g. biased (default: all)")
     parser.add_argument("--pool-root", default=default_pool_root())
     parser.add_argument("--n-episodes", type=int, default=20, help="episodes per (method, partner, position)")
     parser.add_argument("--seed", type=int, default=0)
@@ -89,6 +91,8 @@ def main():
     load = functools.partial(load_pool, layout=args.layout, pool_root=args.pool_root, device=device)
 
     partner_groups = experiment.heldout_partner_groups(args.population, args.layout)
+    if args.partner_groups:
+        partner_groups = {group: partner_groups[group] for group in args.partner_groups}
     partner_paths = {}
     for group_paths in partner_groups.values():
         partner_paths.update(group_paths)
@@ -104,6 +108,7 @@ def main():
         sub_policies = [population_pool[name] for name in population_pool.names()]
         if args.what == "population":
             methods = {f"sub_{name}": functools.partial(NNAgent, population_pool[name], device) for name in population_pool.names()}
+            methods.update({f"subargmax_{name}": functools.partial(NNAgent, population_pool[name], device, argmax_actions=True) for name in population_pool.names()})
             methods["static_ensemble"] = functools.partial(StaticEnsembleAgent, sub_policies, device=device)
             methods["static_ensemble_argmax"] = functools.partial(StaticEnsembleAgent, sub_policies, device=device, argmax_actions=True)
         else:

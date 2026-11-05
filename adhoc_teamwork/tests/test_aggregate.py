@@ -22,6 +22,7 @@ def test_method_family_groups_seeds_of_one_algorithm():
     assert method_family("traj_s36_3") == "traj_s36"
     assert method_family("mappo_sp2_final") == "mappo"
     assert method_family("sub_traj4_final") == "single_sub_policy"
+    assert method_family("subargmax_traj4_final") == "single_sub_policy_argmax"
     assert method_family("static_ensemble") == "static_ensemble"
 
 
@@ -36,7 +37,7 @@ def test_family_scores_and_summary():
 
 
 def test_oracle_takes_best_sub_policy_per_partner_and_ignores_other_methods():
-    table = {"sub_a": {"p1": 10.0, "p2": 0.0}, "sub_b": {"p1": 0.0, "p2": 5.0}, "static_ensemble": {"p1": 99.0, "p2": 99.0}}
+    table = {"sub_a": {"p1": 10.0, "p2": 0.0}, "sub_b": {"p1": 0.0, "p2": 5.0}, "subargmax_a": {"p1": 99.0, "p2": 99.0}, "static_ensemble": {"p1": 99.0, "p2": 99.0}}
     assert oracle_best_sub_policy(table) == {"p1": 10.0, "p2": 5.0}
 
 

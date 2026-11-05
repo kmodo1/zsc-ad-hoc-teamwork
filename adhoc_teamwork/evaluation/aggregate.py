@@ -22,6 +22,7 @@ import numpy as np
 _FAMILY_RULES = [
     (re.compile(r"^mappo_"), "mappo"),
     (re.compile(r"^sub_"), "single_sub_policy"),
+    (re.compile(r"^subargmax_"), "single_sub_policy_argmax"),
     (re.compile(r"^(traj|hsp|fcp|mep|cole)_s\d+_\d+$"), None),
 ]
 
