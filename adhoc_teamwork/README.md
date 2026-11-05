@@ -326,6 +326,48 @@ TrajeDi members are limited both by this and by being mutually compatible, with 
 (479.1 vs. 472.1, against 253.1 vs. 147.9 on `random0_medium`), so there is little to
 choose between.
 
+**Where the gain comes from.** Each cell is a paired difference on the biased partners.
+This first table needs no trained network, and adds single members with argmax actions.
+It was evaluated on a local machine rather than the cluster. The uniform-ensemble and
+single-member means it shares with the tables above agree within 2.6.
+
+| Layout | Population | Ensembling, sampled | Argmax on the ensemble | Argmax on one member | Difference |
+|---|---|---:|---:|---:|---:|
+| `unident_s` | `traj-full10` | +0.3 [-2.2, +2.5] | -1.9 [-14.8, +8.7] | +0.7 [-2.0, +3.6] | -2.6 [-13.1, +5.6] |
+| | `s2-mix` | -2.0 [-6.4, +3.0] | +20.6 [+9.0, +30.0] | +2.1 [-0.5, +4.8] | +18.5 [+7.3, +27.9] |
+| | `hsp-w1` | +20.7 [+11.0, +30.0] | +44.1 [+21.2, +64.4] | -6.8 [-10.1, -3.3] | +50.9 [+29.6, +69.7] |
+| `random0_medium` | `traj-full10` | +13.9 [+7.4, +20.5] | +22.3 [+11.1, +33.7] | -4.2 [-5.3, -3.1] | +26.5 [+15.0, +38.4] |
+| | `s2-mix` | -3.2 [-9.2, +2.2] | +43.4 [+31.0, +54.5] | +2.0 [-0.8, +4.7] | +41.5 [+30.8, +50.7] |
+| | `hsp-w1` | +23.4 [+14.8, +31.1] | +15.9 [+6.5, +25.6] | -3.9 [-5.4, -2.4] | +19.8 [+9.5, +30.4] |
+
+The weighting steps with argmax actions, from the cluster runs. `python -m
+adhoc_teamwork.scripts.gain_breakdown` prints both tables, and the same steps for sampled actions.
+
+| Layout | Population | State-based weights | Memory | Both |
+|---|---|---:|---:|---:|
+| `unident_s` | `traj-full10` | not run | not run | +5.5 [-0.4, +13.7] |
+| | `s2-mix` | +0.9 [-1.2, +2.8] | +3.3 [-2.5, +10.0] | +4.1 [-2.6, +12.1] |
+| | `hsp-w1` | +30.7 [+1.4, +62.6] | +2.3 [-24.6, +28.6] | +33.0 [+6.5, +52.9] |
+| `random0_medium` | `traj-full10` | +29.3 [+10.8, +50.3] | -1.6 [-7.6, +3.6] | +27.7 [+5.7, +51.3] |
+| | `s2-mix` | +4.4 [-0.4, +9.8] | +1.6 [-0.6, +4.0] | +6.0 [+0.8, +11.4] |
+| | `hsp-w1` | +29.7 [+6.0, +57.9] | +7.8 [+3.4, +12.3] | +37.5 [+11.7, +68.6] |
+
+- **Argmax helps ensembles, not single policies.** Argmax changes a single member by -6.8 to
+  +2.1, but helps the uniform ensemble by more than that in five of six cases. The exception
+  is `traj-full10` on `unident_s`, where members are nearly interchangeable. So the gain is
+  not from acting deterministically as such. One possible reason, not tested here, is that
+  the most probable action of a mixture acts like a vote between members, while sampling
+  follows each of them in turn.
+- **`s2-mix` gains from argmax ensembling, and little from weights.** Its members are
+  already strong, and sampling from them gains nothing.
+- **`hsp-w1`, and `traj-full10` on `random0_medium`, gain at every step but memory.** Weights
+  add about 28-38 on top of argmax, mostly without memory. Memory's gain with argmax is
+  only clearly above zero for `hsp-w1` on `random0_medium`.
+- **Nothing helps `traj-full10` on `unident_s`,** which has almost nothing to choose between.
+
+These intervals have no correction for multiple comparisons, and the steps depend on their
+order: weights gain more with sampled actions, where argmax has not already taken its share.
+
 **Argmax beats sampling for ensembles.** Sampling from a mixture of incompatible policies
 produces incoherent behavior. Taking the mixture's most probable action is better for every
 population with uniform weights on `random0_medium` (e.g. 112.5 vs. 156.4 for `s2-mix`),

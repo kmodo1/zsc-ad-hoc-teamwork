@@ -1,0 +1,50 @@
+{
+  "means": {
+    "single_sub_policy": 171.64249999999998,
+    "single_sub_policy_argmax": 164.8225,
+    "static_ensemble": 192.375,
+    "static_ensemble_argmax": 236.475
+  },
+  "steps": {
+    "ensembling_sampled": {
+      "mean_difference": 20.732499999999998,
+      "ci95_low": 11.0319375,
+      "ci95_high": 29.985249999999994,
+      "partners_better": 17,
+      "n_partners": 20,
+      "n_independent_partners": 10
+    },
+    "ensembling_argmax": {
+      "mean_difference": 71.6525,
+      "ci95_low": 48.584875000000004,
+      "ci95_high": 91.502625,
+      "partners_better": 19,
+      "n_partners": 20,
+      "n_independent_partners": 10
+    },
+    "argmax_on_ensemble": {
+      "mean_difference": 44.1,
+      "ci95_low": 21.2,
+      "ci95_high": 64.4,
+      "partners_better": 17,
+      "n_partners": 20,
+      "n_independent_partners": 10
+    },
+    "argmax_on_single": {
+      "mean_difference": -6.820000000000003,
+      "ci95_low": -10.1451875,
+      "ci95_high": -3.279937500000002,
+      "partners_better": 6,
+      "n_partners": 20,
+      "n_independent_partners": 10
+    },
+    "argmax_interaction": {
+      "mean_difference": 50.92,
+      "ci95_low": 29.58462500000001,
+      "ci95_high": 69.7475,
+      "partners_better": 17,
+      "n_partners": 20,
+      "n_independent_partners": 10
+    }
+  }
+}
