@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from adhoc_teamwork.baselines.policy_selection import PolicySelectionAgent
-from adhoc_teamwork.baselines.static_ensemble import StaticEnsembleAgent
+from adhoc_teamwork.baselines.static_ensemble import StaticEnsembleAgent, VoteEnsembleAgent
 from adhoc_teamwork.encoder.trajectory_encoder import TrajectoryEncoder
 from adhoc_teamwork.ensemble.adaptive_ensemble_agent import AdaptiveEnsembleAgent
 from adhoc_teamwork.ensemble.weighting_network import WeightingNetwork
@@ -155,3 +155,47 @@ def test_policy_selection_uses_only_the_selected_sub_policy():
     assert selected == int(np.argmax(agent.last_weights))
     sub_probs, _ = subs[selected].action_probs(torch.as_tensor(obs)[None], subs[selected].initial_state(1))
     assert np.allclose(probs, sub_probs[0].detach().numpy(), atol=1e-6)
+
+
+class _FixedPolicy:
+    """Always outputs the same distribution, respecting the legal-action mask."""
+
+    def __init__(self, probs):
+        self.probs = torch.tensor(probs, dtype=torch.float32)
+
+    def initial_state(self, batch_size=1, device=None):
+        return None
+
+    def action_probs(self, obs, rnn_state, available_actions=None):
+        probs = self.probs.expand(obs.shape[0], -1).clone()
+        if available_actions is not None:
+            probs = probs * available_actions
+            probs = probs / probs.sum(dim=-1, keepdim=True)
+        return probs, rnn_state
+
+
+def _vote_action(member_probs, available=None):
+    agent = VoteEnsembleAgent([_FixedPolicy(p) for p in member_probs])
+    agent.reset(1)
+    return int(agent.act_batch(np.zeros((1, 2), dtype=np.float32), available_actions=available)[0])
+
+
+def test_vote_ignores_confidence_where_the_averaged_argmax_does_not():
+    # Two members mildly prefer action 0; one is very sure of action 1.
+    members = [[0.4, 0.3, 0.3], [0.4, 0.3, 0.3], [0.0, 1.0, 0.0]]
+    assert _vote_action(members) == 0
+    averaged = StaticEnsembleAgent([_FixedPolicy(p) for p in members], argmax_actions=True)
+    averaged.reset(1)
+    assert int(averaged.act_batch(np.zeros((1, 2), dtype=np.float32))[0]) == 1
+
+
+def test_vote_breaks_ties_by_mean_probability():
+    assert _vote_action([[0.9, 0.1], [0.4, 0.6]]) == 0
+    assert _vote_action([[0.6, 0.4], [0.1, 0.9]]) == 1
+
+
+def test_vote_never_picks_an_illegal_action():
+    # Unmasked, action 0 would win. Masked, its two voters move to action 1.
+    members = [[0.8, 0.1, 0.1], [0.8, 0.1, 0.1], [0.1, 0.1, 0.8]]
+    assert _vote_action(members) == 0
+    assert _vote_action(members, available=np.array([[False, True, True]])) == 1

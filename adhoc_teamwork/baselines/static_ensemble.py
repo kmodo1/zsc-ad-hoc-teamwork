@@ -32,3 +32,24 @@ class StaticEnsembleAgent(TorchPolicyAgent):
     def _forward_probs(self, obs_t, available_t):
         sub_probs = sub_policy_probs(self.sub_policies, self._sub_rnn_states, obs_t, available_t)
         return mix(self._weights_t.expand(obs_t.shape[0], -1), sub_probs)
+
+
+class VoteEnsembleAgent(StaticEnsembleAgent):
+    """Each member votes for its most probable action and the agent takes the
+    action with the most votes, breaking ties by the members' mean probability.
+
+    Compared with the argmax of the averaged distribution, this ignores how
+    confident each member is, which tests whether that argmax gains by acting
+    like a vote.
+    """
+
+    def __init__(self, sub_policies, device: torch.device = torch.device("cpu")):
+        super().__init__(sub_policies, device=device, argmax_actions=True)
+
+    def _forward_probs(self, obs_t, available_t):
+        sub_probs = sub_policy_probs(self.sub_policies, self._sub_rnn_states, obs_t, available_t)
+        votes = torch.nn.functional.one_hot(sub_probs.argmax(dim=-1), sub_probs.shape[-1]).sum(dim=1).float()
+        # Vote counts differ by at least 1 and half a mean probability is at most
+        # 0.5, so this only decides ties.
+        scores = votes + 0.5 * sub_probs.mean(dim=1)
+        return scores / scores.sum(dim=-1, keepdim=True)
