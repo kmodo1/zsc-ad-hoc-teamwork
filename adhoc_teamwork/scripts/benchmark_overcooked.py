@@ -10,7 +10,7 @@ Three kinds of method, split so each is only evaluated as often as needed:
                       this population would achieve. It is a reference rather
                       than a strict bound: switching within an episode could
                       in principle exceed it.
-  --what baselines    MAPPO, TrajeDi, HSP, FCP, MEP (once per layout).
+  --what baselines    MAPPO, TrajeDi, HSP, FCP, MEP, COLE, E3T (once per layout).
   --what ensemble     the trained adaptive ensemble, the policy-selection
                       baseline, and learned_static_ensemble (once per training
                       run). The latter fixes the weights at their average over
@@ -34,11 +34,12 @@ import torch
 
 from adhoc_teamwork import experiment
 from adhoc_teamwork.baselines.policy_selection import PolicySelectionAgent
-from adhoc_teamwork.baselines.static_ensemble import StaticEnsembleAgent
+from adhoc_teamwork.baselines.static_ensemble import StaticEnsembleAgent, VoteEnsembleAgent
 from adhoc_teamwork.ensemble.adaptive_ensemble_agent import AdaptiveEnsembleAgent
 from adhoc_teamwork.ensemble.checkpoint import load_ensemble_checkpoint
 from adhoc_teamwork.envs.vec_env import VecEnv
 from adhoc_teamwork.envs.zsceval_adapter import make_overcooked_env
+from adhoc_teamwork.evaluation.aggregate import method_family
 from adhoc_teamwork.evaluation.benchmark import run_benchmark
 from adhoc_teamwork.evaluation.rollout import run_episodes_batched
 from adhoc_teamwork.policies.nn_agent import NNAgent
@@ -79,6 +80,7 @@ def main():
     parser.add_argument("--population", default="traj-s10", choices=experiment.POPULATIONS)
     parser.add_argument("--ensemble", default=None, help="checkpoint from train_adaptive_ensemble (for --what ensemble)")
     parser.add_argument("--argmax-actions", action="store_true", help="baselines take their most probable action, to compare like for like with the argmax ensemble")
+    parser.add_argument("--baseline-families", nargs="+", default=None, help="evaluate only these baselines, e.g. cole_s75 e3t (default: all)")
     parser.add_argument("--partner-groups", nargs="+", default=None, help="evaluate only these partner groups, e.g. biased (default: all)")
     parser.add_argument("--pool-root", default=default_pool_root())
     parser.add_argument("--n-episodes", type=int, default=20, help="episodes per (method, partner, position)")
@@ -101,7 +103,10 @@ def main():
 
     methods = {}
     if args.what == "baselines":
-        baseline_pool = load(experiment.baseline_paths(args.layout))
+        paths = experiment.baseline_paths(args.layout)
+        if args.baseline_families:
+            paths = {name: path for name, path in paths.items() if method_family(name) in args.baseline_families}
+        baseline_pool = load(paths)
         methods = {name: functools.partial(NNAgent, baseline_pool[name], device, argmax_actions=args.argmax_actions) for name in baseline_pool.names()}
     else:
         population_pool = load(experiment.population_paths(args.population, args.layout, args.pool_root))
@@ -111,6 +116,7 @@ def main():
             methods.update({f"subargmax_{name}": functools.partial(NNAgent, population_pool[name], device, argmax_actions=True) for name in population_pool.names()})
             methods["static_ensemble"] = functools.partial(StaticEnsembleAgent, sub_policies, device=device)
             methods["static_ensemble_argmax"] = functools.partial(StaticEnsembleAgent, sub_policies, device=device, argmax_actions=True)
+            methods["static_ensemble_vote"] = functools.partial(VoteEnsembleAgent, sub_policies, device=device)
         else:
             encoder, weighting_net, held_in = load_ensemble_checkpoint(args.ensemble, device=device)
             assert list(held_in) == population_pool.names(), f"checkpoint was trained on {held_in}"

@@ -14,6 +14,7 @@ from adhoc_teamwork.evaluation.aggregate import (
     oracle_best_sub_policy,
     paired_bootstrap_difference,
     population_steps,
+    uniform_vs_baselines,
 )
 from adhoc_teamwork.evaluation.benchmark import _load_done, method_partner_means, run_benchmark
 from adhoc_teamwork.policies.biased_agent import ScriptedBiasedAgent
@@ -25,6 +26,9 @@ def test_method_family_groups_seeds_of_one_algorithm():
     assert method_family("sub_traj4_final") == "single_sub_policy"
     assert method_family("subargmax_traj4_final") == "single_sub_policy_argmax"
     assert method_family("static_ensemble") == "static_ensemble"
+    assert method_family("static_ensemble_vote") == "static_ensemble_vote"
+    assert method_family("cole_s75_2") == "cole_s75"
+    assert method_family("e3t_4") == "e3t"
 
 
 def test_family_scores_and_summary():
@@ -154,3 +158,23 @@ def test_gain_breakdown_reports_missing_memoryless_runs_as_not_run():
     assert missing == {"state_weights": None, "memory": None, "all_weights": step}
     assert fmt(step) == "+4.0 [+1.0, +7.0]"
     assert fmt(None) == "not run"
+
+
+def test_uniform_ensemble_compares_with_baselines_like_for_like():
+    partners = ["p1", "p2"]
+
+    def family(value):
+        return {p: [value] for p in partners}
+
+    scores = {
+        "static_ensemble": family(10.0),
+        "static_ensemble_argmax": family(30.0),
+        "e3t": family(4.0),
+        "e3t_argmax": family(25.0),
+        "cole_s75": {"p1": [1.0]},  # unfinished, so left out
+    }
+    result = uniform_vs_baselines(scores, partners)
+    assert set(result["static_ensemble"]) == {"e3t"}
+    assert result["static_ensemble"]["e3t"]["mean_difference"] == 6.0
+    assert set(result["static_ensemble_argmax"]) == {"e3t_argmax"}
+    assert result["static_ensemble_argmax"]["e3t_argmax"]["mean_difference"] == 5.0

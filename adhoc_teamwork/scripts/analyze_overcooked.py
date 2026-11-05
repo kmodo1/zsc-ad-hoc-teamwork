@@ -19,6 +19,7 @@ from typing import Dict, List
 import numpy as np
 
 from adhoc_teamwork.evaluation.aggregate import (
+    BASELINE_FAMILIES,
     best_fixed_sub_policy,
     family_partner_scores,
     group_summary,
@@ -26,12 +27,13 @@ from adhoc_teamwork.evaluation.aggregate import (
     oracle_best_sub_policy,
     paired_bootstrap_difference,
     population_steps,
+    uniform_vs_baselines,
 )
 from adhoc_teamwork.evaluation.benchmark import _load_done, method_partner_means
 from adhoc_teamwork.evaluation.plotting import plot_family_comparison, plot_weight_trace_grid
 
 
-POPULATION_FAMILIES = ("single_sub_policy", "single_sub_policy_argmax", "static_ensemble", "static_ensemble_argmax")
+POPULATION_FAMILIES = ("single_sub_policy", "single_sub_policy_argmax", "static_ensemble", "static_ensemble_argmax", "static_ensemble_vote")
 
 
 def load_table(path: str) -> Dict[str, Dict[str, float]]:
@@ -107,8 +109,8 @@ def main():
         f
         for f in (
             "static_ensemble", "static_ensemble_argmax", "single_sub_policy", "best_fixed_sub_policy", "oracle_best_sub_policy",
-            "mappo", "traj_s36", "hsp_s36", "fcp_s36", "mep_s36",
-            "mappo_argmax", "traj_s36_argmax", "hsp_s36_argmax", "fcp_s36_argmax", "mep_s36_argmax",
+            "mappo", "traj_s36", "hsp_s36", "fcp_s36", "mep_s36", "cole_s75", "e3t",
+            "mappo_argmax", "traj_s36_argmax", "hsp_s36_argmax", "fcp_s36_argmax", "mep_s36_argmax", "cole_s75_argmax", "e3t_argmax",
         )  # fmt: skip
         if f in scores
     ]
@@ -140,7 +142,12 @@ def main():
     with open(os.path.join(out, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
     biased_rows = summary["groups"]["biased"]
-    steps = {"means": {f: biased_rows[f]["mean"] for f in POPULATION_FAMILIES if f in biased_rows}, "steps": population_steps(scores, primary)}
+    steps = {
+        "means": {f: biased_rows[f]["mean"] for f in POPULATION_FAMILIES if f in biased_rows},
+        "baseline_means": {f: row["mean"] for f, row in biased_rows.items() if f.removesuffix("_argmax") in BASELINE_FAMILIES},
+        "steps": population_steps(scores, primary),
+        "vs_baselines": uniform_vs_baselines(scores, primary),
+    }
     with open(os.path.join(out, "population_steps.json"), "w") as f:
         json.dump(steps, f, indent=2)
 

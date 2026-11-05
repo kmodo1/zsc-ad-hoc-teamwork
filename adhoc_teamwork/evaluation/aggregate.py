@@ -24,7 +24,10 @@ _FAMILY_RULES = [
     (re.compile(r"^sub_"), "single_sub_policy"),
     (re.compile(r"^subargmax_"), "single_sub_policy_argmax"),
     (re.compile(r"^(traj|hsp|fcp|mep|cole)_s\d+_\d+$"), None),
+    (re.compile(r"^e3t_\d+$"), "e3t"),
 ]
+
+BASELINE_FAMILIES = ("mappo", "traj_s36", "hsp_s36", "fcp_s36", "mep_s36", "cole_s75", "e3t")
 
 
 def method_family(method: str) -> str:
@@ -117,7 +120,8 @@ def population_steps(scores: Dict[str, Dict[str, List[float]]], partners: Sequen
     argmax each contribute, and whether argmax helps ensembles more than it
     helps their members. Steps whose families have no results are left out.
     """
-    families = ("single_sub_policy", "single_sub_policy_argmax", "static_ensemble", "static_ensemble_argmax")
+    core = ("single_sub_policy", "single_sub_policy_argmax", "static_ensemble", "static_ensemble_argmax")
+    families = core + ("static_ensemble_vote",)
     means = {f: mean_over_members(scores[f]) for f in families if f in scores and all(p in scores[f] for p in partners)}
     steps = {}
     for name, a, b in (
@@ -125,11 +129,30 @@ def population_steps(scores: Dict[str, Dict[str, List[float]]], partners: Sequen
         ("ensembling_argmax", "static_ensemble_argmax", "single_sub_policy_argmax"),
         ("argmax_on_ensemble", "static_ensemble_argmax", "static_ensemble"),
         ("argmax_on_single", "single_sub_policy_argmax", "single_sub_policy"),
+        ("vote_vs_sampled", "static_ensemble_vote", "static_ensemble"),
+        ("vote_vs_mean_argmax", "static_ensemble_vote", "static_ensemble_argmax"),
     ):
         if a in means and b in means:
             steps[name] = paired_bootstrap_difference(means[a], means[b], partners)
-    if len(means) == len(families):
+    if all(f in means for f in core):
         on_ensemble = {p: means["static_ensemble_argmax"][p] - means["static_ensemble"][p] for p in partners}
         on_single = {p: means["single_sub_policy_argmax"][p] - means["single_sub_policy"][p] for p in partners}
         steps["argmax_interaction"] = paired_bootstrap_difference(on_ensemble, on_single, partners)
     return steps
+
+
+def uniform_vs_baselines(scores: Dict[str, Dict[str, List[float]]], partners: Sequence[str]) -> Dict[str, Dict[str, Dict[str, float]]]:
+    """The uniform ensemble minus each baseline, like for like: sampled against
+    sampled, argmax against argmax. Needs no trained network.
+    """
+    result = {}
+    for ensemble, suffix in (("static_ensemble", ""), ("static_ensemble_argmax", "_argmax")):
+        if ensemble not in scores or not all(p in scores[ensemble] for p in partners):
+            continue
+        ours = mean_over_members(scores[ensemble])
+        result[ensemble] = {
+            f"{family}{suffix}": paired_bootstrap_difference(ours, mean_over_members(scores[f"{family}{suffix}"]), partners)
+            for family in BASELINE_FAMILIES
+            if f"{family}{suffix}" in scores and all(p in scores[f"{family}{suffix}"] for p in partners)
+        }
+    return result
