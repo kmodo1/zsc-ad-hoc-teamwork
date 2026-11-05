@@ -90,6 +90,11 @@ def stage2_baseline_paths(layout: str, algo: str, population_size: int, seeds: I
     return {f"{algo}_s{population_size}_{s}": f"{layout}/{algo}/s2/{algo}-S2-s{population_size}/{s}.pt" for s in seeds}
 
 
+def e3t_baseline_paths(layout: str, seeds: Iterable[int]) -> Dict[str, str]:
+    """E3T agents, which the pool files under stage 1 as it trains no population."""
+    return {f"e3t_{s}": f"{layout}/e3t/s1/e3t/{s}.pt" for s in seeds}
+
+
 def load_pool(paths: Dict[str, str], layout: str, pool_root: str = None, device: torch.device = torch.device("cpu")) -> PolicyPool:
     root = pool_root or default_pool_root()
     pool = PolicyPool()

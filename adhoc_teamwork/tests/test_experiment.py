@@ -55,7 +55,7 @@ def test_specialist_population_never_uses_benchmark_experiments():
     assert all(p.endswith("_final_w1_actor.pt") for p in names.values())
 
 
-@pytest.mark.parametrize("layout", ["unident_s", "random0_medium"])
+@pytest.mark.parametrize("layout", ["unident_s", "random0_medium", "random0", "random1", "random3", "small_corridor"])
 def test_traj_full10_is_a_whole_population(layout):
     """Guards against the pool's swapped traj-S1-s10 / traj-S1-s15 folder labels."""
     import os
@@ -70,3 +70,13 @@ def test_traj_full10_is_a_whole_population(layout):
     assert all(os.path.exists(os.path.join(root, p)) for p in paths.values())
     folder = os.path.dirname(os.path.join(root, next(iter(paths.values()))))
     assert len([f for f in os.listdir(folder) if f.endswith("_final_actor.pt")]) == 10
+
+
+def test_baselines_include_cole_and_e3t_and_exclude_held_out_partners():
+    from adhoc_teamwork.evaluation.aggregate import method_family
+
+    paths = experiment.baseline_paths("unident_s")
+    families = {method_family(name) for name in paths}
+    assert {"mappo", "traj_s36", "hsp_s36", "fcp_s36", "mep_s36", "cole_s75", "e3t"} == families
+    held_out = set(experiment.heldout_partner_groups("traj-full10", "unident_s")["biased"].values())
+    assert not held_out & set(paths.values())

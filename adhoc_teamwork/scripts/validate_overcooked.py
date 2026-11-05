@@ -36,6 +36,8 @@ def agent_checkpoint(layout: str, agent: str) -> str:
     """Pool path of an agent named as in ZSC-Eval's results files."""
     if agent.startswith("sp-"):
         return f"{layout}/fcp/s1/sp/sp{agent.split('-')[1]}_final_actor.pt"
+    if agent.startswith("e3t-"):
+        return f"{layout}/e3t/s1/e3t/{agent.split('-')[1]}.pt"
     algo, stage, size, seed = agent.split("-")
     return f"{layout}/{algo}/{stage.lower()}/{algo}-{stage}-{size}/{seed}.pt"
 

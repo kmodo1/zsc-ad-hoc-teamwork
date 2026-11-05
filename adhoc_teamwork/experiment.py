@@ -13,6 +13,7 @@ from typing import Dict
 from adhoc_teamwork.population.zsceval_pool import (
     benchmark_partner_paths,
     biased_counterpart_paths,
+    e3t_baseline_paths,
     non_benchmark_biased_paths,
     self_play_paths,
     stage1_population_paths,
@@ -28,6 +29,9 @@ POPULATIONS = ("traj-full10", "traj-s10", "mep-s10", "sp8", "s2-mix", "hsp-w1")
 TRAIN_PARTNER_SETS = ("sp", "sp+biased")
 BASELINE_ALGOS = ("traj", "hsp", "fcp", "mep")
 BASELINE_SEEDS = range(1, 6)
+# The folder holding the whole 10-member TrajeDi population; see population_paths.
+TRAJ_FULL10_FOLDER_SIZE = {"random0": 10}
+TRAJ_FULL10_DEFAULT_FOLDER_SIZE = 15
 
 
 def population_paths(population: str, layout: str, pool_root: str = None) -> Dict[str, str]:
@@ -36,11 +40,11 @@ def population_paths(population: str, layout: str, pool_root: str = None) -> Dic
 
     * ``traj-full10``, ``traj-s10``, ``mep-s10``, ``sp8``: self-play-style agents,
       diverse with each other but never trained with anyone outside their own
-      population. The pool's ``traj-S1-s10`` folder actually holds 15 members and
-      ``traj-S1-s15`` holds 10 (the MEP folders are correct), so the labels appear
-      swapped. ``traj-full10`` is the whole 10-member population, which is in the
-      folder labeled s15. ``traj-s10`` is members 1-10 of the apparent 15-member one,
-      kept so that earlier results stay reproducible.
+      population. On every layout we use but ``random0``, the pool's ``traj-S1-s10``
+      folder actually holds 15 members and ``traj-S1-s15`` holds 10 (the MEP folders
+      are correct), so the labels appear swapped. ``traj-full10`` is the whole
+      10-member population, whichever folder holds it. ``traj-s10`` always reads the
+      folder labeled s10, kept so that earlier results stay reproducible.
     * ``s2-mix``: stage-2 agents of several algorithms, each already trained
       to be robust. The baselines themselves are its members.
     * ``hsp-w1``: specialists, each trained alongside one biased partner.
@@ -53,7 +57,8 @@ def population_paths(population: str, layout: str, pool_root: str = None) -> Dic
     if population == "hsp-w1":
         return biased_counterpart_paths(layout, 10, pool_root=pool_root)
     if population == "traj-full10":
-        return stage1_population_paths(layout, "traj", 15, range(1, 11))  # see the note above
+        folder_size = TRAJ_FULL10_FOLDER_SIZE.get(layout, TRAJ_FULL10_DEFAULT_FOLDER_SIZE)
+        return stage1_population_paths(layout, "traj", folder_size, range(1, 11))  # see the note above
     if population == "traj-s10":
         return stage1_population_paths(layout, "traj", 10, range(1, 11))
     if population == "mep-s10":
@@ -97,9 +102,12 @@ def heldout_partner_groups(population: str, layout: str) -> Dict[str, Dict[str, 
 
 def baseline_paths(layout: str) -> Dict[str, str]:
     """Single-policy baselines from Section 4: MAPPO (self-play), TrajeDi and
-    HSP, plus FCP and MEP. Stage-2 agents use their largest trained population.
+    HSP, plus FCP, MEP, COLE and E3T. Stage-2 agents use their largest trained
+    population.
     """
     paths = {f"mappo_{name}": path for name, path in self_play_paths(layout, BASELINE_SEEDS).items()}
     for algo in BASELINE_ALGOS:
         paths.update(stage2_baseline_paths(layout, algo, 36, BASELINE_SEEDS))
+    paths.update(stage2_baseline_paths(layout, "cole", 75, BASELINE_SEEDS))
+    paths.update(e3t_baseline_paths(layout, BASELINE_SEEDS))
     return paths
