@@ -291,6 +291,23 @@ better on `random0_medium`.
 | `random0_medium` | Self-play only | 138.5 | +41.3 [+13.5, +74.7] | 142.9 | +27.7 [+0.0, +60.3] |
 | | Self-play + other biased agents | 142.8 | +45.6 [+21.3, +74.5] | 152.7 | +37.5 [+11.7, +68.6] |
 
+**Cross-play.** Mean return when a member plays itself against when it plays another
+member, over all ordered pairs with 20 episodes each (`crossplay_matrix.png` in each
+population's folder):
+
+| Layout | Population | Self-play | Cross-play | Gap |
+|---|---|---:|---:|---:|
+| `unident_s` | `traj-full10` | 479.1 | 472.1 | +7.0 |
+| | `s2-mix` | 409.2 | 403.3 | +5.8 |
+| | `hsp-w1` | 228.1 | 277.0 | -48.9 |
+| `random0_medium` | `traj-full10` | 253.1 | 147.9 | +105.2 |
+| | `s2-mix` | 240.1 | 230.3 | +9.8 |
+| | `hsp-w1` | 44.9 | 35.8 | +9.1 |
+
+Only `traj-full10` on `random0_medium` shows a large convention mismatch. `s2-mix` members
+work well together on both layouts. The `hsp-w1` gap does not measure the usual mismatch,
+since each member was trained to partner one biased agent rather than itself.
+
 **What each population could reach by choosing among its members, in hindsight:**
 
 | Layout | Population | Best single member | Best member per partner |
