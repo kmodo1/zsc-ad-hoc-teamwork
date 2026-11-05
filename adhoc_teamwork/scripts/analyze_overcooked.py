@@ -25,9 +25,13 @@ from adhoc_teamwork.evaluation.aggregate import (
     mean_over_members,
     oracle_best_sub_policy,
     paired_bootstrap_difference,
+    population_steps,
 )
 from adhoc_teamwork.evaluation.benchmark import _load_done, method_partner_means
 from adhoc_teamwork.evaluation.plotting import plot_family_comparison, plot_weight_trace_grid
+
+
+POPULATION_FAMILIES = ("single_sub_policy", "single_sub_policy_argmax", "static_ensemble", "static_ensemble_argmax")
 
 
 def load_table(path: str) -> Dict[str, Dict[str, float]]:
@@ -135,6 +139,10 @@ def main():
 
     with open(os.path.join(out, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
+    biased_rows = summary["groups"]["biased"]
+    steps = {"means": {f: biased_rows[f]["mean"] for f in POPULATION_FAMILIES if f in biased_rows}, "steps": population_steps(scores, primary)}
+    with open(os.path.join(out, "population_steps.json"), "w") as f:
+        json.dump(steps, f, indent=2)
 
     for group, rows in summary["groups"].items():
         print(f"\n## {args.layout} / {args.population} / partners: {group} ({len(partner_groups[group])})\n")

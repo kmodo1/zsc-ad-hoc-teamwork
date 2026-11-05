@@ -110,3 +110,26 @@ def paired_bootstrap_difference(a: Dict[str, float], b: Dict[str, float], partne
 
 def mean_over_members(scores: Dict[str, List[float]]) -> Dict[str, float]:
     return {p: float(np.mean(v)) for p, v in scores.items()}
+
+
+def population_steps(scores: Dict[str, Dict[str, List[float]]], partners: Sequence[str]) -> Dict[str, Dict[str, float]]:
+    """Paired differences that need no trained network: what ensembling and
+    argmax each contribute, and whether argmax helps ensembles more than it
+    helps their members. Steps whose families have no results are left out.
+    """
+    families = ("single_sub_policy", "single_sub_policy_argmax", "static_ensemble", "static_ensemble_argmax")
+    means = {f: mean_over_members(scores[f]) for f in families if f in scores and all(p in scores[f] for p in partners)}
+    steps = {}
+    for name, a, b in (
+        ("ensembling_sampled", "static_ensemble", "single_sub_policy"),
+        ("ensembling_argmax", "static_ensemble_argmax", "single_sub_policy_argmax"),
+        ("argmax_on_ensemble", "static_ensemble_argmax", "static_ensemble"),
+        ("argmax_on_single", "single_sub_policy_argmax", "single_sub_policy"),
+    ):
+        if a in means and b in means:
+            steps[name] = paired_bootstrap_difference(means[a], means[b], partners)
+    if len(means) == len(families):
+        on_ensemble = {p: means["static_ensemble_argmax"][p] - means["static_ensemble"][p] for p in partners}
+        on_single = {p: means["single_sub_policy_argmax"][p] - means["single_sub_policy"][p] for p in partners}
+        steps["argmax_interaction"] = paired_bootstrap_difference(on_ensemble, on_single, partners)
+    return steps
