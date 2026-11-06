@@ -325,7 +325,10 @@ def shareworker(remote, parent_remote, env_fn_wrapper, worker_id: int = None):
     parent_remote.close()
     env = env_fn_wrapper.x()
     if worker_id is not None:
-        psutil.Process().cpu_affinity([worker_id])
+        # Local change: under Slurm a job may only use some CPUs, so pin to one of those.
+        process = psutil.Process()
+        allowed_cpus = process.cpu_affinity()
+        process.cpu_affinity([allowed_cpus[worker_id % len(allowed_cpus)]])
     while True:
         cmd, data = remote.recv()
         if cmd == "step":
@@ -478,7 +481,10 @@ def dummyvecenvworker(remote, parent_remote, env_fns_wrapper: CloudpickleWrapper
     share_dummy_vecenv = ShareDummyVecEnv(env_fns)
     # logger.debug("dummyvecenvworker start")
     if worker_id is not None:
-        psutil.Process().cpu_affinity([worker_id])
+        # Local change: under Slurm a job may only use some CPUs, so pin to one of those.
+        process = psutil.Process()
+        allowed_cpus = process.cpu_affinity()
+        process.cpu_affinity([allowed_cpus[worker_id % len(allowed_cpus)]])
     while True:
         cmd, data = remote.recv()
         if cmd == "step":
@@ -914,7 +920,10 @@ def chooseworker_aff(remote, parent_remote, env_fn_wrapper, worker_id: int = Non
     parent_remote.close()
     env = env_fn_wrapper.x()
     if worker_id is not None:
-        psutil.Process().cpu_affinity([worker_id])
+        # Local change: under Slurm a job may only use some CPUs, so pin to one of those.
+        process = psutil.Process()
+        allowed_cpus = process.cpu_affinity()
+        process.cpu_affinity([allowed_cpus[worker_id % len(allowed_cpus)]])
     while True:
         cmd, data = remote.recv()
         if cmd == "step":
