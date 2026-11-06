@@ -21,6 +21,9 @@ export WANDB_DATA_DIR="${WANDB_DATA_DIR:-$ADHOC_SCRATCH/wandb/.data}"
 mkdir -p "$WANDB_DIR"
 
 export ZSC_POLICY_POOL="${ZSC_POLICY_POOL:-$HOME/ZSC-Eval/zsceval/policy_pool}"
+# For ZSC-Eval's trainers: where they read policy configs and write their runs.
+export POLICY_POOL="$ZSC_POLICY_POOL"
+export ZSC_RESULTS_DIR="${ZSC_RESULTS_DIR:-$ADHOC_SCRATCH/zsc_results}"
 
 # A venv layered on the `zsceval` conda env, adding only pytest. Create with:
 #   /path/to/envs/zsceval/bin/python -m venv --system-site-packages $ADHOC_SCRATCH/venv

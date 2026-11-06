@@ -8,6 +8,7 @@ the evaluation set. ``tests/test_experiment.py`` checks this.
 
 from __future__ import annotations
 
+import os
 from typing import Dict
 
 from adhoc_teamwork.population.zsceval_pool import (
@@ -25,13 +26,19 @@ ENSEMBLE_SP_SEEDS = range(1, 9)
 TRAIN_SP_SEEDS = range(9, 16)
 HELDOUT_SP_SEEDS = range(1, 6)  # only held out when the ensemble is not built from self-play
 
-POPULATIONS = ("traj-full10", "traj-s10", "mep-s10", "sp8", "s2-mix", "hsp-w1")
+POPULATIONS = ("traj-full10", "traj-s10", "mep-s10", "sp8", "s2-mix", "hsp-w1", "traj-new10", "hsp-w1-new")
 TRAIN_PARTNER_SETS = ("sp", "sp+biased")
 BASELINE_ALGOS = ("traj", "hsp", "fcp", "mep")
 BASELINE_SEEDS = range(1, 6)
 # The folder holding the whole 10-member TrajeDi population; see population_paths.
 TRAJ_FULL10_FOLDER_SIZE = {"random0": 10}
 TRAJ_FULL10_DEFAULT_FOLDER_SIZE = 15
+
+
+def new_policy_root() -> str:
+    """Where ``scripts/extract_new_policies.py`` puts policies trained in this project."""
+    default = os.path.join(os.environ.get("ADHOC_SCRATCH", os.path.expanduser("~/adhoc_teamwork")), "new_policies")
+    return os.environ.get("ZSC_NEW_POLICIES", default)
 
 
 def population_paths(population: str, layout: str, pool_root: str = None) -> Dict[str, str]:
@@ -48,7 +55,14 @@ def population_paths(population: str, layout: str, pool_root: str = None) -> Dic
     * ``s2-mix``: stage-2 agents of several algorithms, each already trained
       to be robust. The baselines themselves are its members.
     * ``hsp-w1``: specialists, each trained alongside one biased partner.
+    * ``traj-new10``, ``hsp-w1-new``: the same kinds of policy as ``traj-full10`` and
+      ``hsp-w1``, trained here with new random seeds. ``hsp-w1-new`` uses the same 10
+      biased reward styles as ``hsp-w1``. Their absolute paths bypass the pool root.
     """
+    if population == "traj-new10":
+        return {f"traj{m}_final": os.path.join(new_policy_root(), layout, "traj", f"traj{m}_final_actor.pt") for m in range(1, 11)}
+    if population == "hsp-w1-new":
+        return {name: os.path.join(new_policy_root(), layout, "hsp", os.path.basename(path)) for name, path in biased_counterpart_paths(layout, 10, pool_root=pool_root).items()}
     if population == "s2-mix":
         paths = {}
         for algo in BASELINE_ALGOS:
@@ -103,7 +117,7 @@ def heldout_partner_groups(population: str, layout: str) -> Dict[str, Dict[str, 
 def baseline_paths(layout: str) -> Dict[str, str]:
     """Single-policy baselines from Section 4: MAPPO (self-play), TrajeDi and
     HSP, plus FCP, MEP, COLE and E3T. Stage-2 agents use their largest trained
-    population.
+    population (36, or 75 for COLE).
     """
     paths = {f"mappo_{name}": path for name, path in self_play_paths(layout, BASELINE_SEEDS).items()}
     for algo in BASELINE_ALGOS:

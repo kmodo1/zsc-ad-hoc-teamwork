@@ -1,3 +1,4 @@
+import os
 import random
 import socket
 from os import path as osp
@@ -17,5 +18,6 @@ def setup_seed(seed: int):
 
 def get_base_run_dir() -> str:
     socket.gethostname()
-    base = osp.join(osp.expanduser("~"), "ZSC/results")
+    # Local change: runs can be large, so allow keeping them off a small home quota.
+    base = os.environ.get("ZSC_RESULTS_DIR", osp.join(osp.expanduser("~"), "ZSC/results"))
     return base

@@ -59,7 +59,8 @@ def load_zsceval_policy(pool_root: str, layout: str, rel_path: str, device: torc
     from zsceval.algorithms.r_mappo.algorithm.r_actor_critic import R_Actor
 
     path = os.path.join(pool_root, rel_path)
-    state_dict = torch.load(path, map_location=device, weights_only=False)
+    # weights_only: checkpoints are plain tensors, and pool files may be downloaded.
+    state_dict = torch.load(path, map_location=device, weights_only=True)
     kind = "rnn" if any(k.startswith("rnn.") for k in state_dict) else "mlp"
     config_path = os.path.join(pool_root, layout, "policy_config", f"{kind}_policy_config.pkl")
     with open(config_path, "rb") as f:
