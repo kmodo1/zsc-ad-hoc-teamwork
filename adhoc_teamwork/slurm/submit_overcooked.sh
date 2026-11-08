@@ -8,7 +8,9 @@
 #
 # Environment overrides:
 #   LAYOUTS, POPULATION, ARMS, SEEDS, N_ITERATIONS, EPISODES_PER_ITERATION,
-#   PARTNERS_PER_ITERATION, ONLY (eval|train; default both)
+#   PARTNERS_PER_ITERATION, ONLY (eval|train; default both), and TRAIN_DEPENDENCY
+#   (passed as --dependency to the training jobs, e.g. afterok:123; sbatch has no
+#   environment variable for this)
 #
 # An arm is <estimator>:<train partner set>[:<encoder ablation>], e.g.
 # actor_critic:sp or actor_critic:sp:memoryless.
@@ -47,7 +49,7 @@ for layout in $LAYOUTS; do
             [ "$ablation" != "none" ] && arm_name="$arm_name-$ablation"
             for seed in $SEEDS; do
                 out="$dir/$arm_name/seed$seed"
-                train_job=$(sbatch --parsable -J "adhoc-train-$layout-$POPULATION-$arm_name-$seed" "$RUN" \
+                train_job=$(sbatch --parsable -J "adhoc-train-$layout-$POPULATION-$arm_name-$seed" ${TRAIN_DEPENDENCY:+--dependency="$TRAIN_DEPENDENCY"} "$RUN" \
                     python -m adhoc_teamwork.scripts.train_adaptive_ensemble --env overcooked --layout "$layout" \
                     --population "$POPULATION" --train-partners "$partners" --advantage "$estimator" --encoder-ablation "$ablation" \
                     --n-iterations "$N_ITERATIONS" --episodes-per-iteration "$EPISODES_PER_ITERATION" \
