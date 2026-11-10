@@ -19,7 +19,9 @@ class WeightingNetwork(nn.Module):
             nn.Linear(hidden_size, num_policies),
         )
 
+    def logits(self, embedding: torch.Tensor) -> torch.Tensor:
+        return self.net(embedding)
+
     def forward(self, embedding: torch.Tensor) -> torch.Tensor:
         """Returns softmax weights, shape (B, num_policies), summing to 1."""
-        logits = self.net(embedding)
-        return torch.softmax(logits, dim=-1)
+        return torch.softmax(self.logits(embedding), dim=-1)

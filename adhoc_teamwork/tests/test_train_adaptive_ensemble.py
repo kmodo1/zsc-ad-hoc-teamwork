@@ -135,3 +135,66 @@ def test_gae_matches_hand_computation():
     # t=1: delta = 1 - 0.25 = 0.75. t=0: delta = 0 + 0.5*0.25 - 0.5 = -0.375; adv = -0.375 + 0.25*0.75
     assert np.allclose(advantages[:, 0], [-0.1875, 0.75])
     assert np.allclose(returns, advantages + values)
+
+
+def _rule_inputs():
+    torch.manual_seed(0)
+    logits = torch.randn(64, 3, requires_grad=True)
+    sub_probs = torch.softmax(torch.randn(64, 3, 5), dim=-1)
+    sub_probs[:, :, 4] = 0.0  # an illegal action, masked out by every sub-policy
+    return logits, sub_probs / sub_probs.sum(-1, keepdim=True)
+
+
+def test_every_action_rule_gives_legal_actions_and_a_gradient():
+    import math
+
+    import pytest
+
+    from adhoc_teamwork.training.train_adaptive_ensemble import ACTION_RULES, choose_actions
+
+    for rule in ACTION_RULES:
+        logits, sub_probs = _rule_inputs()
+        log_std = torch.full((3,), math.log(0.5), requires_grad=True)
+        actions, log_prob = choose_actions(rule, logits, sub_probs, log_std)
+        assert actions.shape == (64,) and log_prob.shape == (64,)
+        assert (actions != 4).all(), rule
+        log_prob.sum().backward()
+        assert logits.grad is not None and logits.grad.abs().sum() > 0, rule
+        if rule == "argmax":
+            assert log_std.grad is not None and log_std.grad.abs().sum() > 0
+    with pytest.raises(ValueError):
+        choose_actions("vote", *_rule_inputs())
+
+
+def test_argmax_rule_without_noise_takes_the_mixtures_most_probable_action():
+    from adhoc_teamwork.ensemble.adaptive_ensemble_agent import mix
+    from adhoc_teamwork.training.train_adaptive_ensemble import choose_actions
+
+    logits, sub_probs = _rule_inputs()
+    actions, _ = choose_actions("argmax", logits, sub_probs, torch.full((3,), -30.0))
+    assert torch.equal(actions, mix(torch.softmax(logits, -1), sub_probs).argmax(-1))
+
+
+def test_select_argmax_rule_acts_with_one_sub_policy():
+    from adhoc_teamwork.training.train_adaptive_ensemble import choose_actions
+
+    logits, sub_probs = _rule_inputs()
+    one_hot = torch.full_like(logits, -30.0)
+    one_hot[:, 1] = 30.0  # always select sub-policy 1
+    actions, log_prob = choose_actions("select_argmax", one_hot, sub_probs)
+    assert torch.equal(actions, sub_probs[:, 1].argmax(-1))
+    assert torch.allclose(log_prob, torch.zeros(64), atol=1e-6)
+
+
+def test_argmax_rule_trains_and_resumes_its_noise_scale(tmp_path):
+    env = OvercookedGridworld(horizon=10)
+    subs = [ActorCritic(env.obs_dim, env.num_actions, hidden_size=8) for _ in range(2)]
+    path = str(tmp_path / "state.pt")
+    cfg = EnsembleTrainConfig(advantage="actor_critic", action_rule="argmax")
+    kwargs = dict(embed_dim=8, encoder_hidden=16, weighting_hidden=16, episodes_per_iteration=2, seed=0, checkpoint_path=path, checkpoint_every=1, cfg=cfg)
+    sampler = lambda: ScriptedBiasedAgent("pot_tender", noise=0.2)  # noqa: E731
+    train_adaptive_ensemble(env, subs, sampler, n_iterations=2, **kwargs)
+    saved = torch.load(path, weights_only=False)["log_std"]
+    assert saved.shape == (2,)
+    _, _, stats = train_adaptive_ensemble(env, subs, sampler, n_iterations=3, **kwargs)
+    assert len(stats.weight_noise_std) == 3

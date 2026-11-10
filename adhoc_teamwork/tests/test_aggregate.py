@@ -178,3 +178,28 @@ def test_uniform_ensemble_compares_with_baselines_like_for_like():
     assert result["static_ensemble"]["e3t"]["mean_difference"] == 6.0
     assert set(result["static_ensemble_argmax"]) == {"e3t_argmax"}
     assert result["static_ensemble_argmax"]["e3t_argmax"]["mean_difference"] == 5.0
+
+
+def test_sign_flip_p_value_is_exact_for_small_samples():
+    from adhoc_teamwork.evaluation.aggregate import sign_flip_p_value
+
+    assert sign_flip_p_value(np.ones(10)) == 2 / 1024, "only all-positive and all-negative are as extreme"
+    assert sign_flip_p_value(np.ones(5)) == 2 / 32, "5 partners can never reach 0.05"
+    assert sign_flip_p_value(np.zeros(6)) == 1.0
+    assert sign_flip_p_value(np.array([1.0, -1.0, 1.0, -1.0])) == 1.0
+    assert 0.0 < sign_flip_p_value(np.ones(30)) < 0.001, "Monte Carlo above 16 differences"
+
+
+def test_holm_adjustment_is_monotone_and_capped():
+    from adhoc_teamwork.evaluation.aggregate import holm_adjust
+
+    adjusted = holm_adjust({"a": 0.01, "b": 0.04, "c": 0.03, "d": 0.5})
+    assert adjusted == {"a": 0.04, "c": 0.09, "b": 0.09, "d": 0.5}
+    assert holm_adjust({"a": 0.6, "b": 0.7}) == {"a": 1.0, "b": 1.0}
+
+
+def test_paired_difference_reports_p_value_over_distinct_agents():
+    partners = [f"bias{i}_{t}" for i in range(10) for t in ("mid", "final")]
+    base = {p: 0.0 for p in partners}
+    result = paired_bootstrap_difference({p: 1.0 for p in partners}, base, partners)
+    assert result["p_value"] == 2 / 1024, "10 agents, not 20 checkpoints"

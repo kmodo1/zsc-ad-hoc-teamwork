@@ -19,10 +19,15 @@ estimators are available (``EnsembleTrainConfig.advantage``):
 * ``"actor_critic"``: per-step GAE advantages, from a value head on the
   partner embedding. Lower variance, and predicting return from the embedding
   gives the encoder a reason to capture what matters about the partner.
+
+The ensemble is trained acting the way it will be evaluated
+(``EnsembleTrainConfig.action_rule``; see :func:`choose_actions`): sampling from
+the mixture, taking its most probable action, or selecting one sub-policy.
 """
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
@@ -51,6 +56,15 @@ class EnsembleTrainConfig:
     # Rewards are divided by this before computing advantages, so loss scales
     # do not depend on the environment's reward units.
     reward_scale: float = 1.0
+    # How the ensemble acts, in training as at evaluation; see choose_actions.
+    action_rule: str = "sample"
+    # "argmax" only: initial standard deviation of the exploration noise on the
+    # weight logits, which is then learned within weight_noise_bounds.
+    weight_noise_init: float = 0.5
+    weight_noise_bounds: Tuple[float, float] = (0.05, 2.0)
+
+
+ACTION_RULES = ("sample", "argmax", "select", "select_argmax")
 
 
 @dataclass
@@ -60,6 +74,7 @@ class EnsembleTrainStats:
     weight_entropy: List[float] = field(default_factory=list)  # mean H(w_t), nats
     weight_within_episode_std: List[float] = field(default_factory=list)  # how much weights move during an episode
     weight_between_episode_std: List[float] = field(default_factory=list)  # how much they differ between episodes
+    weight_noise_std: List[float] = field(default_factory=list)  # "argmax" only: mean exploration noise on the logits
 
 
 @dataclass
@@ -90,6 +105,40 @@ def assign_partners(partners: List[Agent], n_envs: int) -> Tuple[List[Tuple[Agen
     return groups, ego_positions
 
 
+def choose_actions(rule: str, logits: torch.Tensor, sub_probs: torch.Tensor, log_std: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Act as the ensemble will at evaluation, with enough randomness for a
+    policy gradient. Returns (actions (B,), log-probability (B,) of the random
+    choice that was made), the latter differentiable in ``logits`` (B, K) and
+    ``log_std`` (K,). ``sub_probs`` is (B, K, A).
+
+    * ``sample``: sample from the mixture of the sub-policies' distributions.
+    * ``argmax``: add Gaussian noise to the weight logits and take the most
+      probable action of the resulting mixture. The action is a deterministic
+      function of the noisy weights, as at evaluation, where the noise is left
+      out, so the random choice is the weights themselves.
+    * ``select`` / ``select_argmax``: draw one sub-policy with probability equal
+      to its weight and act with it, sampling its action or taking its most
+      probable one. At evaluation the highest-weighted sub-policy is used.
+    """
+    weights = torch.softmax(logits, dim=-1)
+    batch = torch.arange(logits.shape[0], device=logits.device)
+    if rule == "sample":
+        combined = mix(weights, sub_probs)
+        actions = torch.multinomial(combined.detach(), 1).squeeze(-1)
+        return actions, combined.gather(1, actions.unsqueeze(1)).squeeze(1).clamp_min(1e-8).log()
+    if rule == "argmax":
+        std = log_std.exp().expand_as(logits)
+        noisy = logits.detach() + std.detach() * torch.randn_like(logits)
+        log_prob = torch.distributions.Normal(logits, std).log_prob(noisy).sum(dim=-1)
+        return mix(torch.softmax(noisy, dim=-1), sub_probs).argmax(dim=-1), log_prob
+    if rule in ("select", "select_argmax"):
+        selected = torch.multinomial(weights.detach(), 1).squeeze(-1)
+        chosen = sub_probs[batch, selected]
+        actions = chosen.argmax(dim=-1) if rule == "select_argmax" else torch.multinomial(chosen, 1).squeeze(-1)
+        return actions, weights[batch, selected].clamp_min(1e-8).log()
+    raise ValueError(f"unknown action rule {rule!r}; choose from {ACTION_RULES}")
+
+
 def collect_rollout(
     vec_env: VecEnv,
     sub_policies: list,
@@ -99,6 +148,8 @@ def collect_rollout(
     groups: List[Tuple[Agent, np.ndarray]],
     ego_positions: np.ndarray,
     device: torch.device,
+    action_rule: str = "sample",
+    log_std: Optional[torch.Tensor] = None,
 ) -> _Rollout:
     """Play one batch of episodes with the differentiable ensemble."""
     n = vec_env.n
@@ -117,13 +168,13 @@ def collect_rollout(
         ego_legal = torch.as_tensor(legal[envs, ego_positions], dtype=torch.bool, device=device)
 
         embedding, encoder_state = encoder.step(ego_obs, prev_partner_onehot, encoder_state)
-        weights = weighting_net(embedding)
+        logits = weighting_net.logits(embedding)
+        weights = torch.softmax(logits, dim=-1)
         with torch.no_grad():
             sub_probs = sub_policy_probs(sub_policies, sub_rnn_states, ego_obs, ego_legal)
-        combined = mix(weights, sub_probs)
-        ego_actions_t = torch.multinomial(combined.detach(), 1).squeeze(-1)
+        ego_actions_t, log_prob = choose_actions(action_rule, logits, sub_probs, log_std)
 
-        log_probs.append(combined.gather(1, ego_actions_t.unsqueeze(1)).squeeze(1).clamp_min(1e-8).log())
+        log_probs.append(log_prob)
         entropies.append(-(weights.clamp_min(1e-8) * weights.clamp_min(1e-8).log()).sum(dim=-1))
         values.append(value_head(embedding).squeeze(-1))
         weight_history.append(weights.detach().cpu().numpy())
@@ -223,6 +274,8 @@ def train_adaptive_ensemble(
     iterations. Returns (encoder, weighting_net, EnsembleTrainStats).
     """
     cfg = cfg or EnsembleTrainConfig()
+    if cfg.action_rule not in ACTION_RULES:
+        raise ValueError(f"unknown action rule {cfg.action_rule!r}; choose from {ACTION_RULES}")
     torch.manual_seed(seed)
     np.random.seed(seed)
     if partners_per_iteration is None:
@@ -240,6 +293,11 @@ def train_adaptive_ensemble(
     weighting_net = WeightingNetwork(embed_dim, len(sub_policies), hidden_size=weighting_hidden).to(device)
     value_head = nn.Linear(embed_dim, 1).to(device)
     params = list(encoder.parameters()) + list(weighting_net.parameters()) + list(value_head.parameters())
+    log_std = None
+    if cfg.action_rule == "argmax":
+        log_std = nn.Parameter(torch.full((len(sub_policies),), math.log(cfg.weight_noise_init), device=device))
+        params.append(log_std)
+    log_std_bounds = tuple(math.log(b) for b in cfg.weight_noise_bounds)
     optimizer = torch.optim.Adam(params, lr=cfg.lr)
 
     stats = EnsembleTrainStats()
@@ -250,6 +308,8 @@ def train_adaptive_ensemble(
         encoder.load_state_dict(ckpt["encoder"])
         weighting_net.load_state_dict(ckpt["weighting_net"])
         value_head.load_state_dict(ckpt["value_head"])
+        if log_std is not None:
+            log_std.data.copy_(ckpt["log_std"])
         optimizer.load_state_dict(ckpt["optimizer"])
         stats = EnsembleTrainStats(**ckpt["stats"])
         baseline = ckpt["baseline"]
@@ -263,12 +323,14 @@ def train_adaptive_ensemble(
     for it in range(start_iteration, n_iterations):
         partners = [partner_sampler() for _ in range(partners_per_iteration)]
         groups, ego_positions = assign_partners(partners, vec_env.n)
-        rollout = collect_rollout(vec_env, sub_policies, encoder, weighting_net, value_head, groups, ego_positions, device)
+        rollout = collect_rollout(vec_env, sub_policies, encoder, weighting_net, value_head, groups, ego_positions, device, cfg.action_rule, log_std)
         loss = ensemble_loss(rollout, baseline, cfg, device)
         optimizer.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(params, cfg.max_grad_norm)
         optimizer.step()
+        if log_std is not None:
+            log_std.data.clamp_(*log_std_bounds)
 
         episode_returns = rollout.rewards.sum(axis=0)
         mean_return = float(episode_returns.mean())
@@ -278,6 +340,8 @@ def train_adaptive_ensemble(
         stats.weight_entropy.append(float(rollout.weight_entropy.mean().item()))
         stats.weight_within_episode_std.append(float(rollout.weights.std(axis=0).mean()))
         stats.weight_between_episode_std.append(float(rollout.weights.mean(axis=0).std(axis=0).mean()))
+        if log_std is not None:
+            stats.weight_noise_std.append(float(log_std.detach().exp().mean().item()))
 
         if verbose and (it % log_every == 0 or it == n_iterations - 1):
             print(
@@ -291,6 +355,7 @@ def train_adaptive_ensemble(
                     "encoder": encoder.state_dict(),
                     "weighting_net": weighting_net.state_dict(),
                     "value_head": value_head.state_dict(),
+                    "log_std": None if log_std is None else log_std.detach().cpu(),
                     "optimizer": optimizer.state_dict(),
                     "stats": asdict(stats),
                     "baseline": baseline,

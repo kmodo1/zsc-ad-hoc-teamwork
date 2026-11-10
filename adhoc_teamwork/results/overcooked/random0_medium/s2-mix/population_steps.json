@@ -29,7 +29,8 @@
       "ci95_high": 1.962552083333334,
       "partners_better": 9,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.36328125
     },
     "ensembling_argmax": {
       "mean_difference": 39.70625,
@@ -37,7 +38,8 @@
       "ci95_high": 48.79802083333333,
       "partners_better": 20,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.001953125
     },
     "argmax_on_ensemble": {
       "mean_difference": 43.825,
@@ -45,7 +47,8 @@
       "ci95_high": 56.02562499999999,
       "partners_better": 20,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.001953125
     },
     "argmax_on_single": {
       "mean_difference": 0.9937499999999995,
@@ -53,7 +56,8 @@
       "ci95_high": 3.4249999999999985,
       "partners_better": 11,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.4375
     },
     "vote_vs_sampled": {
       "mean_difference": 44.025,
@@ -61,7 +65,8 @@
       "ci95_high": 55.77562499999999,
       "partners_better": 20,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.001953125
     },
     "vote_vs_mean_argmax": {
       "mean_difference": 0.2,
@@ -69,7 +74,8 @@
       "ci95_high": 1.775,
       "partners_better": 10,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.8359375
     },
     "argmax_interaction": {
       "mean_difference": 42.831250000000004,
@@ -77,7 +83,8 @@
       "ci95_high": 54.035624999999996,
       "partners_better": 20,
       "n_partners": 20,
-      "n_independent_partners": 10
+      "n_independent_partners": 10,
+      "p_value": 0.001953125
     }
   },
   "vs_baselines": {
@@ -88,7 +95,8 @@
         "ci95_high": 4.710000000000001,
         "partners_better": 11,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.34375
       },
       "traj_s36": {
         "mean_difference": 8.74,
@@ -96,7 +104,8 @@
         "ci95_high": 13.780124999999996,
         "partners_better": 17,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.015625
       },
       "hsp_s36": {
         "mean_difference": -21.775000000000002,
@@ -104,7 +113,8 @@
         "ci95_high": -13.099875,
         "partners_better": 3,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.005859375
       },
       "fcp_s36": {
         "mean_difference": -5.744999999999998,
@@ -112,7 +122,8 @@
         "ci95_high": 4.145125000000001,
         "partners_better": 11,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.3203125
       },
       "mep_s36": {
         "mean_difference": -3.7799999999999985,
@@ -120,7 +131,8 @@
         "ci95_high": 9.61087499999999,
         "partners_better": 14,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.646484375
       },
       "cole_s75": {
         "mean_difference": -13.259999999999996,
@@ -128,7 +140,8 @@
         "ci95_high": 3.2550000000000003,
         "partners_better": 10,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.22265625
       },
       "e3t": {
         "mean_difference": -13.070000000000002,
@@ -136,7 +149,8 @@
         "ci95_high": -7.684875000000002,
         "partners_better": 2,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.00390625
       }
     },
     "static_ensemble_argmax": {
@@ -146,7 +160,8 @@
         "ci95_high": 53.959999999999994,
         "partners_better": 19,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.001953125
       },
       "traj_s36_argmax": {
         "mean_difference": 52.404999999999994,
@@ -154,7 +169,8 @@
         "ci95_high": 61.56512499999998,
         "partners_better": 20,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.001953125
       },
       "hsp_s36_argmax": {
         "mean_difference": 15.610000000000003,
@@ -162,7 +178,8 @@
         "ci95_high": 29.170125000000002,
         "partners_better": 14,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.078125
       },
       "fcp_s36_argmax": {
         "mean_difference": 40.760000000000005,
@@ -170,7 +187,8 @@
         "ci95_high": 49.99012499999999,
         "partners_better": 20,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.001953125
       },
       "mep_s36_argmax": {
         "mean_difference": 37.315,
@@ -178,7 +196,8 @@
         "ci95_high": 49.92,
         "partners_better": 20,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.001953125
       },
       "cole_s75_argmax": {
         "mean_difference": 30.235000000000003,
@@ -186,7 +205,8 @@
         "ci95_high": 44.49574999999998,
         "partners_better": 19,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.001953125
       },
       "e3t_argmax": {
         "mean_difference": 25.445000000000004,
@@ -194,7 +214,8 @@
         "ci95_high": 33.095,
         "partners_better": 20,
         "n_partners": 20,
-        "n_independent_partners": 10
+        "n_independent_partners": 10,
+        "p_value": 0.001953125
       }
     }
   }

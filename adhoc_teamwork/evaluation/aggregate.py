@@ -9,6 +9,10 @@ Uncertainty comes from two places, handled separately:
 * Across partners: a difference between two methods is only meaningful if it
   holds across partners rather than coming from one or two of them, so
   differences are bootstrapped over partners, pairing the two methods on each.
+
+Each difference also gets a p-value from an exact sign-flip test over the same
+distinct partners. A table makes many comparisons at once, so ``holm_adjust``
+corrects a table's p-values for that (Holm, 1979).
 """
 
 from __future__ import annotations
@@ -88,10 +92,40 @@ def partner_cluster(partner: str) -> str:
     return re.sub(r"_(init|mid|final)$", "", partner)
 
 
+def sign_flip_p_value(differences: np.ndarray, n_resamples: int = 20000, seed: int = 0) -> float:
+    """Two-sided p-value for a mean difference of zero, flipping the sign of
+    each independent difference at random: exact (every sign pattern) for up to
+    16 differences, Monte Carlo above. With n differences it is never below
+    2 / 2**n, so 5 partners can never reach 0.05.
+    """
+    differences = np.asarray(differences, dtype=float)
+    n = len(differences)
+    if n <= 16:
+        signs = 1 - 2 * ((np.arange(2**n)[:, None] >> np.arange(n)) & 1)
+    else:
+        signs = np.random.default_rng(seed).choice([-1, 1], size=(n_resamples, n))
+        signs[0] = 1  # include the observed pattern
+    flipped = np.abs((signs * differences).mean(axis=1))
+    return float(np.mean(flipped >= abs(differences.mean()) - 1e-9))
+
+
+def holm_adjust(p_values: Dict[str, float]) -> Dict[str, float]:
+    """Holm-adjusted p-values for one family of comparisons: a comparison is
+    significant at level alpha, controlling the chance of any false positive in
+    the family, when its adjusted p-value is at most alpha.
+    """
+    adjusted, running = {}, 0.0
+    ordered = sorted(p_values.items(), key=lambda kv: kv[1])
+    for i, (key, p) in enumerate(ordered):
+        running = max(running, min(1.0, (len(ordered) - i) * p))
+        adjusted[key] = running
+    return adjusted
+
+
 def paired_bootstrap_difference(a: Dict[str, float], b: Dict[str, float], partners: Sequence[str], n_boot: int = 10000, seed: int = 0) -> Dict[str, float]:
-    """Mean of a - b over partners, with a percentile bootstrap CI. Resamples
-    distinct agents rather than checkpoints, which are not independent and
-    would make the interval too narrow.
+    """Mean of a - b over partners, with a percentile bootstrap CI and a
+    sign-flip p-value. Both resample distinct agents rather than checkpoints,
+    which are not independent and would make the interval too narrow.
     """
     clusters: Dict[str, List[float]] = {}
     for p in partners:
@@ -108,6 +142,7 @@ def paired_bootstrap_difference(a: Dict[str, float], b: Dict[str, float], partne
         "partners_better": int((diffs > 0).sum()),
         "n_partners": int(len(diffs)),
         "n_independent_partners": int(len(clusters)),
+        "p_value": sign_flip_p_value(cluster_diffs),
     }
 
 
