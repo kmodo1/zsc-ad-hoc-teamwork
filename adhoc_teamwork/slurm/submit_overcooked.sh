@@ -8,7 +8,7 @@
 #
 # Environment overrides:
 #   LAYOUTS, POPULATION, ARMS, SEEDS, N_ITERATIONS, EPISODES_PER_ITERATION,
-#   PARTNERS_PER_ITERATION, DEPENDENCY (passed as --dependency to every job but
+#   PARTNERS_PER_ITERATION, TEMPERATURE_END (final temperature of the anneal rule, default 0.3), DEPENDENCY (passed as --dependency to every job but
 #   evaluations of new training runs, e.g. afterok:123, and the jobs cancel
 #   themselves if it fails; sbatch has no environment variable for this),
 #   TRAIN_DEPENDENCY (the same, for training jobs only; overrides DEPENDENCY),
@@ -23,6 +23,8 @@
 #
 # An arm is <estimator>:<train partner set>[:<encoder ablation>[:<action rule>]],
 # e.g. actor_critic:sp, actor_critic:sp:memoryless or actor_critic:no-biased:none:argmax.
+# The anneal rule (e.g. actor_critic:sp+biased:none:anneal) samples actions at a temperature
+# annealed from 1 to TEMPERATURE_END, to train the weights for the argmax rule.
 # The run directory is <estimator>-<partners>[-<ablation>][-<rule>], leaving out
 # the defaults (no ablation, sampling).
 
@@ -34,6 +36,7 @@ SEEDS="${SEEDS:-0 1 2}"
 N_ITERATIONS="${N_ITERATIONS:-1000}"
 EPISODES_PER_ITERATION="${EPISODES_PER_ITERATION:-64}"
 PARTNERS_PER_ITERATION="${PARTNERS_PER_ITERATION:-8}"
+TEMPERATURE_END="${TEMPERATURE_END:-0.3}"
 ONLY="${ONLY:-baselines crossplay population train}"
 ROOT="${ADHOC_SCRATCH:-/cmlscratch/$USER/adhoc_teamwork}/runs"
 RUN="adhoc_teamwork/slurm/run.sbatch"
@@ -89,7 +92,7 @@ for layout in $LAYOUTS; do
                 sbatch --parsable -J "adhoc-train-$job_name" $TRAIN_DEP "$RUN" bash adhoc_teamwork/slurm/chain.sh \
                     python -m adhoc_teamwork.scripts.train_adaptive_ensemble --env overcooked --layout "$layout" \
                     --population "$POPULATION" --train-partners "$partners" --advantage "$estimator" --encoder-ablation "$ablation" \
-                    --action-rule "$rule" --n-iterations "$N_ITERATIONS" --episodes-per-iteration "$EPISODES_PER_ITERATION" \
+                    --action-rule "$rule" --temperature-end "$TEMPERATURE_END" --n-iterations "$N_ITERATIONS" --episodes-per-iteration "$EPISODES_PER_ITERATION" \
                     --partners-per-iteration "$PARTNERS_PER_ITERATION" --embed-dim 32 --encoder-hidden 64 --weighting-hidden 64 \
                     --device cuda --seed "$seed" --out "$out" ::: "${eval_cmd[@]}"
             done

@@ -535,8 +535,14 @@ Not done:
 
 - **Training with the action rule Section 4 describes.** The weighting network trains by
   sampling from the mixture (`training/train_adaptive_ensemble.py`), but Section 4's method
-  takes the argmax, so argmax results use weights tuned for sampled behavior. Its effect
-  has not been measured.
+  takes the argmax, so argmax results use weights tuned for sampled behavior. The trainer
+  has action rules for this (`--action-rule`, the fourth field of an arm). One, `anneal`,
+  samples training actions from `softmax(log(mixture) / T)` with T annealed from 1 to
+  `--temperature-end` (argmax itself has no gradient). It is unit-tested but has not been run
+  on real Overcooked, e.g.
+  `LAYOUTS="random0_medium random3" POPULATION=s2-mix ARMS=actor_critic:sp+biased:none:anneal ONLY=train bash adhoc_teamwork/slurm/submit_overcooked.sh`
+  (`TEMPERATURE_END`, default 0.3). `analyze_overcooked` then prints the paired difference
+  from the same arm trained by sampling (T = 1). The effect of any rule has not been measured.
 - **Policy selection with argmax.** It has only run with sampled actions, so it should
   not be compared with the argmax ensembles.
 - **Retraining `s2-mix`.** Each stage-2 agent takes 100M steps, so only the stage-1

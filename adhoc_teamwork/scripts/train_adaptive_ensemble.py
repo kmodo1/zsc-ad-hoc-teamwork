@@ -94,10 +94,14 @@ def main():
         choices=ACTION_RULES,
         default="sample",
         help="how the ensemble acts while training, matching an evaluation method: sample (adaptive_ensemble), argmax "
-        "(adaptive_ensemble_argmax), select (policy_selection) or select_argmax (policy_selection_argmax)",
+        "(adaptive_ensemble_argmax), select (policy_selection), select_argmax (policy_selection_argmax) or anneal (sample "
+        "from the mixture at a temperature annealed towards argmax; evaluated as adaptive_ensemble_argmax)",
     )
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-entropy-coef", type=float, default=0.01)
+    parser.add_argument("--temperature-start", type=float, default=1.0, help="anneal rule: actions are sampled from softmax(log(mixture) / T); T at the first iteration")
+    parser.add_argument("--temperature-end", type=float, default=0.3, help="anneal rule: T at the end of the anneal. Below 1 trains towards the argmax rule")
+    parser.add_argument("--temperature-anneal-fraction", type=float, default=1.0, help="anneal rule: fraction of the iterations over which T moves linearly from start to end")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--quiet", action="store_true")
@@ -131,7 +135,8 @@ def main():
         n_iterations=args.n_iterations,
         episodes_per_iteration=args.episodes_per_iteration,
         partners_per_iteration=args.partners_per_iteration,
-        cfg=EnsembleTrainConfig(lr=args.lr, weight_entropy_coef=args.weight_entropy_coef, advantage=args.advantage, reward_scale=reward_scale, action_rule=args.action_rule),
+        cfg=EnsembleTrainConfig(lr=args.lr, weight_entropy_coef=args.weight_entropy_coef, advantage=args.advantage, reward_scale=reward_scale, action_rule=args.action_rule,
+            temperature_start=args.temperature_start, temperature_end=args.temperature_end, temperature_anneal_fraction=args.temperature_anneal_fraction),
         device=device,
         seed=args.seed,
         verbose=not args.quiet,

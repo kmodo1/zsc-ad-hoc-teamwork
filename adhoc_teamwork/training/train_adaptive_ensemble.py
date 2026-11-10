@@ -23,6 +23,12 @@ estimators are available (``EnsembleTrainConfig.advantage``):
 The ensemble is trained acting the way it will be evaluated
 (``EnsembleTrainConfig.action_rule``; see :func:`choose_actions`): sampling from
 the mixture, taking its most probable action, or selecting one sub-policy.
+
+The ``anneal`` rule trains weights for the argmax rule differently from
+``argmax`` (which adds noise to the weight logits): actions are sampled from the
+mixture sharpened by a temperature, ``softmax(log(mix) / T)``, with T annealed
+from ``temperature_start`` to ``temperature_end``. It is still a proper policy
+gradient, and approaches the argmax policy as T falls.
 """
 
 from __future__ import annotations
@@ -62,9 +68,22 @@ class EnsembleTrainConfig:
     # weight logits, which is then learned within weight_noise_bounds.
     weight_noise_init: float = 0.5
     weight_noise_bounds: Tuple[float, float] = (0.05, 2.0)
+    # "anneal" only: actions are sampled from softmax(log(mix) / temperature),
+    # which moves linearly from start to end over the first
+    # temperature_anneal_fraction of training and then stays at end. Values
+    # below 1 approach the argmax rule used at evaluation.
+    temperature_start: float = 1.0
+    temperature_end: float = 0.3
+    temperature_anneal_fraction: float = 1.0
+
+    def temperature(self, iteration: int, n_iterations: int) -> float:
+        """Temperature of 0-based ``iteration`` out of ``n_iterations`` ("anneal" rule)."""
+        anneal_iterations = self.temperature_anneal_fraction * (n_iterations - 1)
+        progress = 1.0 if anneal_iterations <= 0 else min(1.0, iteration / anneal_iterations)
+        return self.temperature_start + progress * (self.temperature_end - self.temperature_start)
 
 
-ACTION_RULES = ("sample", "argmax", "select", "select_argmax")
+ACTION_RULES = ("sample", "argmax", "select", "select_argmax", "anneal")
 
 
 @dataclass
@@ -75,6 +94,7 @@ class EnsembleTrainStats:
     weight_within_episode_std: List[float] = field(default_factory=list)  # how much weights move during an episode
     weight_between_episode_std: List[float] = field(default_factory=list)  # how much they differ between episodes
     weight_noise_std: List[float] = field(default_factory=list)  # "argmax" only: mean exploration noise on the logits
+    temperature: List[float] = field(default_factory=list)  # action-sampling temperature of each iteration (1 unless "anneal")
 
 
 @dataclass
@@ -105,13 +125,30 @@ def assign_partners(partners: List[Agent], n_envs: int) -> Tuple[List[Tuple[Agen
     return groups, ego_positions
 
 
-def choose_actions(rule: str, logits: torch.Tensor, sub_probs: torch.Tensor, log_std: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+def tempered_distribution(combined: torch.Tensor, temperature: float) -> Tuple[torch.Tensor, torch.Tensor]:
+    """The behavior policy at ``temperature``: (probabilities, log-probabilities)
+    of softmax(log(combined) / temperature), both (n, A) and differentiable in
+    ``combined``. Actions the mixture gives zero probability keep zero.
+    """
+    if temperature <= 0:
+        raise ValueError(f"temperature must be positive, got {temperature}")
+    if temperature == 1.0:  # the mixture itself, with no renormalization rounding
+        return combined, combined.clamp_min(1e-8).log()
+    logits = combined.clamp_min(1e-8).log() / temperature
+    log_probs = torch.log_softmax(logits.masked_fill(combined <= 0, float("-inf")), dim=-1)
+    return log_probs.exp(), log_probs
+
+
+def choose_actions(
+    rule: str, logits: torch.Tensor, sub_probs: torch.Tensor, log_std: Optional[torch.Tensor] = None, temperature: float = 1.0
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """Act as the ensemble will at evaluation, with enough randomness for a
     policy gradient. Returns (actions (B,), log-probability (B,) of the random
     choice that was made), the latter differentiable in ``logits`` (B, K) and
     ``log_std`` (K,). ``sub_probs`` is (B, K, A).
 
     * ``sample``: sample from the mixture of the sub-policies' distributions.
+    * ``anneal``: sample from the mixture sharpened by ``temperature``.
     * ``argmax``: add Gaussian noise to the weight logits and take the most
       probable action of the resulting mixture. The action is a deterministic
       function of the noisy weights, as at evaluation, where the noise is left
@@ -122,10 +159,11 @@ def choose_actions(rule: str, logits: torch.Tensor, sub_probs: torch.Tensor, log
     """
     weights = torch.softmax(logits, dim=-1)
     batch = torch.arange(logits.shape[0], device=logits.device)
-    if rule == "sample":
+    if rule in ("sample", "anneal"):
         combined = mix(weights, sub_probs)
-        actions = torch.multinomial(combined.detach(), 1).squeeze(-1)
-        return actions, combined.gather(1, actions.unsqueeze(1)).squeeze(1).clamp_min(1e-8).log()
+        probs, log_probs = tempered_distribution(combined, temperature if rule == "anneal" else 1.0)
+        actions = torch.multinomial(probs.detach(), 1).squeeze(-1)
+        return actions, log_probs.gather(1, actions.unsqueeze(1)).squeeze(1)
     if rule == "argmax":
         std = log_std.exp().expand_as(logits)
         noisy = logits.detach() + std.detach() * torch.randn_like(logits)
@@ -150,6 +188,7 @@ def collect_rollout(
     device: torch.device,
     action_rule: str = "sample",
     log_std: Optional[torch.Tensor] = None,
+    temperature: float = 1.0,
 ) -> _Rollout:
     """Play one batch of episodes with the differentiable ensemble."""
     n = vec_env.n
@@ -172,7 +211,7 @@ def collect_rollout(
         weights = torch.softmax(logits, dim=-1)
         with torch.no_grad():
             sub_probs = sub_policy_probs(sub_policies, sub_rnn_states, ego_obs, ego_legal)
-        ego_actions_t, log_prob = choose_actions(action_rule, logits, sub_probs, log_std)
+        ego_actions_t, log_prob = choose_actions(action_rule, logits, sub_probs, log_std, temperature)
 
         log_probs.append(log_prob)
         entropies.append(-(weights.clamp_min(1e-8) * weights.clamp_min(1e-8).log()).sum(dim=-1))
@@ -271,7 +310,9 @@ def train_adaptive_ensemble(
     parameters receive no gradient). ``env`` is a :class:`TwoAgentEnv` or a
     callable constructing one. With ``checkpoint_path``, training resumes from
     that file if it exists and saves to it every ``checkpoint_every``
-    iterations. Returns (encoder, weighting_net, EnsembleTrainStats).
+    iterations. The temperature of the ``anneal`` rule depends only on the
+    iteration number and ``n_iterations``, so a resumed run continues the same
+    schedule. Returns (encoder, weighting_net, EnsembleTrainStats).
     """
     cfg = cfg or EnsembleTrainConfig()
     if cfg.action_rule not in ACTION_RULES:
@@ -323,7 +364,8 @@ def train_adaptive_ensemble(
     for it in range(start_iteration, n_iterations):
         partners = [partner_sampler() for _ in range(partners_per_iteration)]
         groups, ego_positions = assign_partners(partners, vec_env.n)
-        rollout = collect_rollout(vec_env, sub_policies, encoder, weighting_net, value_head, groups, ego_positions, device, cfg.action_rule, log_std)
+        temperature = cfg.temperature(it, n_iterations) if cfg.action_rule == "anneal" else 1.0
+        rollout = collect_rollout(vec_env, sub_policies, encoder, weighting_net, value_head, groups, ego_positions, device, cfg.action_rule, log_std, temperature)
         loss = ensemble_loss(rollout, baseline, cfg, device)
         optimizer.zero_grad()
         loss.backward()
@@ -342,11 +384,12 @@ def train_adaptive_ensemble(
         stats.weight_between_episode_std.append(float(rollout.weights.mean(axis=0).std(axis=0).mean()))
         if log_std is not None:
             stats.weight_noise_std.append(float(log_std.detach().exp().mean().item()))
+        stats.temperature.append(temperature)
 
         if verbose and (it % log_every == 0 or it == n_iterations - 1):
             print(
                 f"[adaptive-ensemble] iter {it:4d}  return={mean_return:7.2f}  baseline={baseline:6.2f}  loss={loss.item():.3f}  "
-                f"H(w)={stats.weight_entropy[-1]:.3f}  std_within={stats.weight_within_episode_std[-1]:.4f}  std_between={stats.weight_between_episode_std[-1]:.4f}",
+                f"H(w)={stats.weight_entropy[-1]:.3f}  T={temperature:.3f}  std_within={stats.weight_within_episode_std[-1]:.4f}  std_between={stats.weight_between_episode_std[-1]:.4f}",
                 flush=True,
             )
         if checkpoint_path and ((it + 1) % checkpoint_every == 0 or it == n_iterations - 1):
