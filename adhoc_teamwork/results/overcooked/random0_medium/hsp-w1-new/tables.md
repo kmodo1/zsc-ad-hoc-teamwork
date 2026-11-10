@@ -132,6 +132,8 @@
 | actor_critic-sp+biased/adaptive_ensemble | mep_s36_argmax | +24.1 | [+13.6, +35.5] | 18/20 |
 | actor_critic-sp+biased/adaptive_ensemble | cole_s75_argmax | +17.0 | [+4.1, +31.3] | 14/20 |
 | actor_critic-sp+biased/adaptive_ensemble | e3t_argmax | +12.2 | [+2.8, +21.3] | 14/20 |
+| actor_critic-sp+biased/adaptive_ensemble | best_baseline | +8.8 | [-5.5, +21.2] | 15/20 |
+| actor_critic-sp+biased/adaptive_ensemble | best_baseline_argmax | +2.4 | [-10.6, +13.6] | 11/20 |
 | actor_critic-sp+biased/adaptive_ensemble_argmax | actor_critic-sp+biased/learned_static_ensemble | +36.0 | [+24.1, +49.3] | 20/20 |
 | actor_critic-sp+biased/adaptive_ensemble_argmax | actor_critic-sp+biased/top_learned_sub_policy | +12.5 | [+2.1, +23.9] | 13/20 |
 | actor_critic-sp+biased/adaptive_ensemble_argmax | static_ensemble | +54.5 | [+28.8, +84.2] | 20/20 |
@@ -153,6 +155,8 @@
 | actor_critic-sp+biased/adaptive_ensemble_argmax | mep_s36_argmax | +34.6 | [+22.3, +48.1] | 19/20 |
 | actor_critic-sp+biased/adaptive_ensemble_argmax | cole_s75_argmax | +27.5 | [+13.8, +42.4] | 17/20 |
 | actor_critic-sp+biased/adaptive_ensemble_argmax | e3t_argmax | +22.7 | [+12.6, +32.0] | 17/20 |
+| actor_critic-sp+biased/adaptive_ensemble_argmax | best_baseline | +19.3 | [+1.6, +35.1] | 15/20 |
+| actor_critic-sp+biased/adaptive_ensemble_argmax | best_baseline_argmax | +12.9 | [-3.4, +27.1] | 15/20 |
 | actor_critic-sp+biased/policy_selection | actor_critic-sp+biased/learned_static_ensemble | +31.5 | [+18.6, +45.7] | 20/20 |
 | actor_critic-sp+biased/policy_selection | actor_critic-sp+biased/top_learned_sub_policy | +8.0 | [+0.6, +16.1] | 14/20 |
 | actor_critic-sp+biased/policy_selection | static_ensemble | +50.0 | [+22.7, +80.9] | 20/20 |
@@ -174,6 +178,8 @@
 | actor_critic-sp+biased/policy_selection | mep_s36_argmax | +30.0 | [+21.2, +39.6] | 20/20 |
 | actor_critic-sp+biased/policy_selection | cole_s75_argmax | +23.0 | [+11.4, +35.7] | 16/20 |
 | actor_critic-sp+biased/policy_selection | e3t_argmax | +18.2 | [+6.8, +28.6] | 17/20 |
+| actor_critic-sp+biased/policy_selection | best_baseline | +14.8 | [+1.6, +26.8] | 15/20 |
+| actor_critic-sp+biased/policy_selection | best_baseline_argmax | +8.3 | [-3.8, +19.8] | 13/20 |
 | actor_critic-sp+biased/learned_static_ensemble | static_ensemble | +18.5 | [+3.2, +35.0] | 15/20 |
 | actor_critic-sp+biased/learned_static_ensemble | static_ensemble_argmax | -13.7 | [-24.7, -3.6] | 6/20 |
 | actor_critic-sp+biased/learned_static_ensemble | single_sub_policy | +32.3 | [+19.6, +46.0] | 20/20 |
@@ -193,6 +199,8 @@
 | actor_critic-sp+biased/learned_static_ensemble | mep_s36_argmax | -1.5 | [-21.2, +16.5] | 13/20 |
 | actor_critic-sp+biased/learned_static_ensemble | cole_s75_argmax | -8.5 | [-31.2, +12.9] | 12/20 |
 | actor_critic-sp+biased/learned_static_ensemble | e3t_argmax | -13.3 | [-22.8, -4.5] | 4/20 |
+| actor_critic-sp+biased/learned_static_ensemble | best_baseline | -16.7 | [-28.3, -4.2] | 6/20 |
+| actor_critic-sp+biased/learned_static_ensemble | best_baseline_argmax | -23.2 | [-33.1, -13.2] | 4/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble | actor_critic-sp+biased-memoryless/learned_static_ensemble | +20.0 | [+10.8, +30.0] | 20/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble | actor_critic-sp+biased-memoryless/top_learned_sub_policy | -4.8 | [-16.5, +7.6] | 7/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble | static_ensemble | +37.2 | [+14.3, +63.2] | 19/20 |
@@ -214,6 +222,8 @@
 | actor_critic-sp+biased-memoryless/adaptive_ensemble | mep_s36_argmax | +17.3 | [+4.2, +31.2] | 16/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble | cole_s75_argmax | +10.2 | [-5.3, +26.9] | 13/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble | e3t_argmax | +5.4 | [-3.6, +15.0] | 11/20 |
+| actor_critic-sp+biased-memoryless/adaptive_ensemble | best_baseline | +2.0 | [-12.2, +14.5] | 14/20 |
+| actor_critic-sp+biased-memoryless/adaptive_ensemble | best_baseline_argmax | -4.4 | [-17.3, +6.2] | 9/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | actor_critic-sp+biased-memoryless/learned_static_ensemble | +31.1 | [+20.1, +41.7] | 20/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | actor_critic-sp+biased-memoryless/top_learned_sub_policy | +6.3 | [-7.7, +20.9] | 10/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | static_ensemble | +48.3 | [+25.2, +74.9] | 19/20 |
@@ -235,6 +245,8 @@
 | actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | mep_s36_argmax | +28.4 | [+13.1, +44.9] | 17/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | cole_s75_argmax | +21.3 | [+4.0, +39.5] | 16/20 |
 | actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | e3t_argmax | +16.5 | [+6.0, +26.7] | 13/20 |
+| actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | best_baseline | +13.1 | [-5.0, +29.0] | 15/20 |
+| actor_critic-sp+biased-memoryless/adaptive_ensemble_argmax | best_baseline_argmax | +6.7 | [-10.0, +20.7] | 14/20 |
 | actor_critic-sp+biased-memoryless/policy_selection | actor_critic-sp+biased-memoryless/learned_static_ensemble | +26.2 | [+13.6, +40.0] | 20/20 |
 | actor_critic-sp+biased-memoryless/policy_selection | actor_critic-sp+biased-memoryless/top_learned_sub_policy | +1.4 | [-7.9, +12.2] | 9/20 |
 | actor_critic-sp+biased-memoryless/policy_selection | static_ensemble | +43.3 | [+16.8, +73.5] | 19/20 |
@@ -256,6 +268,8 @@
 | actor_critic-sp+biased-memoryless/policy_selection | mep_s36_argmax | +23.4 | [+12.3, +36.1] | 17/20 |
 | actor_critic-sp+biased-memoryless/policy_selection | cole_s75_argmax | +16.3 | [+3.1, +31.7] | 15/20 |
 | actor_critic-sp+biased-memoryless/policy_selection | e3t_argmax | +11.5 | [+0.2, +22.6] | 11/20 |
+| actor_critic-sp+biased-memoryless/policy_selection | best_baseline | +8.1 | [-8.2, +22.1] | 15/20 |
+| actor_critic-sp+biased-memoryless/policy_selection | best_baseline_argmax | +1.7 | [-13.4, +14.8] | 12/20 |
 | actor_critic-sp+biased-memoryless/learned_static_ensemble | static_ensemble | +17.2 | [+2.5, +33.8] | 13/20 |
 | actor_critic-sp+biased-memoryless/learned_static_ensemble | static_ensemble_argmax | -15.0 | [-26.3, -4.5] | 6/20 |
 | actor_critic-sp+biased-memoryless/learned_static_ensemble | single_sub_policy | +31.1 | [+18.7, +44.3] | 20/20 |
@@ -275,6 +289,8 @@
 | actor_critic-sp+biased-memoryless/learned_static_ensemble | mep_s36_argmax | -2.7 | [-23.1, +15.7] | 13/20 |
 | actor_critic-sp+biased-memoryless/learned_static_ensemble | cole_s75_argmax | -9.8 | [-32.9, +12.1] | 12/20 |
 | actor_critic-sp+biased-memoryless/learned_static_ensemble | e3t_argmax | -14.6 | [-24.1, -5.4] | 2/20 |
+| actor_critic-sp+biased-memoryless/learned_static_ensemble | best_baseline | -18.0 | [-29.4, -5.7] | 5/20 |
+| actor_critic-sp+biased-memoryless/learned_static_ensemble | best_baseline_argmax | -24.4 | [-34.2, -14.5] | 4/20 |
 
 ## Ablations on biased partners (complete encoder - ablated, 95% bootstrap CI over distinct partner agents)
 

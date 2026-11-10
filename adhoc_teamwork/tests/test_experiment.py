@@ -8,8 +8,12 @@ pytest.importorskip("zsceval")
 from adhoc_teamwork import experiment  # noqa: E402
 
 
+# Populations that read the pool to choose their members.
+_POOL_POPULATIONS = ("hsp-w1", "hsp-w1-new") + tuple(experiment.MIXED_POPULATIONS)
+
+
 @pytest.mark.parametrize("layout", ["unident_s", "random0_medium"])
-@pytest.mark.parametrize("population", [p for p in experiment.POPULATIONS if p not in ("hsp-w1", "hsp-w1-new")])
+@pytest.mark.parametrize("population", [p for p in experiment.POPULATIONS if p not in _POOL_POPULATIONS])
 def test_evaluation_partners_are_disjoint_from_training_partners_and_sub_policies(layout, population):
     # "sp" only here: "sp+biased" and "hsp-w1" read the pool and are tested below.
     train = set(experiment.train_partner_paths("sp", layout).values())
@@ -23,7 +27,7 @@ def test_evaluation_partners_are_disjoint_from_training_partners_and_sub_policie
 def test_sub_policies_never_train_against_themselves():
     train = set(experiment.train_partner_paths("sp", "unident_s").values())
     for population in experiment.POPULATIONS:
-        if population not in ("hsp-w1", "hsp-w1-new"):
+        if population not in _POOL_POPULATIONS:
             assert not train & set(experiment.population_paths(population, "unident_s").values())
 
 
@@ -141,3 +145,77 @@ def test_extraction_only_uses_finished_runs(tmp_path):
     assert collect(sources, str(out)) == 1
     assert (out / "done.pt").read_text() == "run2", "must take the finished run, not the preempted one"
     assert not (out / "partial.pt").exists()
+
+
+def _need_pool(layout="unident_s"):
+    import os
+
+    from adhoc_teamwork.population.zsceval_pool import default_pool_root
+
+    if not os.path.isdir(os.path.join(default_pool_root(), layout)):
+        pytest.skip("no local policy pool")
+
+
+@pytest.mark.parametrize("layout", ["unident_s", "random0_medium", "random3"])
+@pytest.mark.parametrize("population", ["hsp-w1", "s2-mix", "traj-full10"] + list(experiment.MIXED_POPULATIONS))
+def test_no_training_set_overlaps_any_evaluation_group(layout, population):
+    """Covers every partner set, including the generator-held-out ones, and the
+    files they point to exist."""
+    import os
+
+    from adhoc_teamwork.population.zsceval_pool import default_pool_root
+
+    _need_pool(layout)
+    root = default_pool_root()
+    subs = set(experiment.population_paths(population, layout).values())
+    for partner_set in experiment.TRAIN_PARTNER_SETS:
+        train = set(experiment.train_partner_paths(partner_set, layout).values())
+        assert all(os.path.exists(os.path.join(root, p)) for p in train), partner_set
+        assert not train & subs, f"{partner_set} trains sub-policies against themselves"
+        for group, paths in experiment.heldout_partner_groups(population, layout).items():
+            assert not set(paths.values()) & train, f"{group} overlaps {partner_set}"
+            assert not set(paths.values()) & subs, f"{group} overlaps the sub-policies"
+            assert all(os.path.exists(os.path.join(root, p)) for p in paths.values()), group
+
+
+def test_generator_held_out_sets_leave_out_exactly_one_generator():
+    _need_pool()
+    everything = experiment.train_partner_groups("all-gen", "unident_s")
+    assert set(everything) == set(experiment.TRAINING_GENERATORS)
+    for generator in experiment.TRAINING_GENERATORS:
+        groups = experiment.train_partner_groups(f"no-{generator}", "unident_s")
+        assert set(groups) == set(experiment.TRAINING_GENERATORS) - {generator}
+        assert experiment.balanced_over_generators(f"no-{generator}")
+    assert not experiment.balanced_over_generators("sp+biased"), "keeps the original runs reproducible"
+    assert sum(len(g) for g in everything.values()) == len(experiment.train_partner_paths("all-gen", "unident_s")), "no name collisions"
+
+
+def test_partner_groups_keep_their_original_order_and_unique_names():
+    """Episode seeds follow this order, so existing results stay comparable."""
+    groups = experiment.all_partner_groups("unident_s")
+    assert list(groups)[:3] == ["biased", "mep", "self_play"]
+    names = [n for g in groups.values() for n in g]
+    assert len(names) == len(set(names))
+    assert list(groups["self_play"])[:5] == [f"sp{s}_final" for s in range(1, 6)]
+    assert len(groups["cole"]) == 10 and len(groups["e3t"]) == 5
+
+
+def test_stage2_populations_skip_groups_their_members_trained_with():
+    for population in ["s2-mix"] + list(experiment.MIXED_POPULATIONS):
+        groups = experiment.heldout_partner_groups(population, "unident_s")
+        assert "self_play" not in groups and "traj" not in groups
+        assert "mep" in groups, "stage-2 agents trained with mep-S1-s15, not the s10 population"
+    assert "traj" not in experiment.heldout_partner_groups("traj-full10", "unident_s")
+    assert set(experiment.heldout_partner_groups("hsp-w1", "unident_s")) == set(experiment.all_partner_groups("unident_s"))
+
+
+def test_mixed_populations_have_the_stated_ratios():
+    import re
+
+    _need_pool()
+    for population, (seeds, specialists, traj_members) in experiment.MIXED_POPULATIONS.items():
+        names = list(experiment.population_paths(population, "unident_s"))
+        assert len(names) == 12
+        assert sum(n.endswith("_w1") for n in names) == specialists
+        assert sum(n.startswith("traj") and n.endswith("_final") for n in names) == traj_members
+        assert sum(bool(re.match(r"^(traj|hsp|fcp|mep)_s36_\d+$", n)) for n in names) == 4 * seeds

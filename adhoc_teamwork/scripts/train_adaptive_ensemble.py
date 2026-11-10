@@ -28,7 +28,7 @@ from adhoc_teamwork.envs.gridworld_overcooked import OvercookedGridworld
 from adhoc_teamwork.policies.nn_agent import NNAgent
 from adhoc_teamwork.policies.biased_agent import ScriptedBiasedAgent
 from adhoc_teamwork.population.policy_pool import PolicyPool
-from adhoc_teamwork.training.train_adaptive_ensemble import EnsembleTrainConfig, train_adaptive_ensemble
+from adhoc_teamwork.training.train_adaptive_ensemble import ACTION_RULES, EnsembleTrainConfig, train_adaptive_ensemble
 
 # The weighting network is trained against a *training* distribution of
 # partners (here: moderately-noisy scripted roles) that is deliberately
@@ -53,10 +53,17 @@ def make_overcooked_setup(args, device):
     from adhoc_teamwork.population.zsceval_pool import load_pool
 
     pool = load_pool(experiment.population_paths(args.population, args.layout, args.pool_root), args.layout, args.pool_root, device)
+    generators = experiment.train_partner_groups(args.train_partners, args.layout, args.pool_root)
     partner_pool = load_pool(experiment.train_partner_paths(args.train_partners, args.layout, args.pool_root), args.layout, args.pool_root, device)
-    partners = [NNAgent(partner_pool[name], device) for name in partner_pool.names()]
+    agents = {name: NNAgent(partner_pool[name], device) for name in partner_pool.names()}
     rng = random.Random(args.seed)
-    return (lambda: make_overcooked_env(args.layout, horizon=args.horizon)), pool, (lambda: rng.choice(partners)), SOUP_DELIVERY_REWARD
+    if experiment.balanced_over_generators(args.train_partners):
+        by_generator = [[agents[name] for name in paths] for paths in generators.values()]
+        sampler = lambda: rng.choice(rng.choice(by_generator))  # noqa: E731
+    else:
+        partners = list(agents.values())
+        sampler = lambda: rng.choice(partners)  # noqa: E731
+    return (lambda: make_overcooked_env(args.layout, horizon=args.horizon)), pool, sampler, SOUP_DELIVERY_REWARD
 
 
 def main():
@@ -82,6 +89,13 @@ def main():
         help="no_partner_action: hide the partner's actions from the encoder. memoryless: also remove its memory, so weights depend only on the current state.",
     )
     parser.add_argument("--advantage", choices=["reinforce", "actor_critic"], default="reinforce")
+    parser.add_argument(
+        "--action-rule",
+        choices=ACTION_RULES,
+        default="sample",
+        help="how the ensemble acts while training, matching an evaluation method: sample (adaptive_ensemble), argmax "
+        "(adaptive_ensemble_argmax), select (policy_selection) or select_argmax (policy_selection_argmax)",
+    )
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-entropy-coef", type=float, default=0.01)
     parser.add_argument("--device", type=str, default="cpu")
@@ -117,7 +131,7 @@ def main():
         n_iterations=args.n_iterations,
         episodes_per_iteration=args.episodes_per_iteration,
         partners_per_iteration=args.partners_per_iteration,
-        cfg=EnsembleTrainConfig(lr=args.lr, weight_entropy_coef=args.weight_entropy_coef, advantage=args.advantage, reward_scale=reward_scale),
+        cfg=EnsembleTrainConfig(lr=args.lr, weight_entropy_coef=args.weight_entropy_coef, advantage=args.advantage, reward_scale=reward_scale, action_rule=args.action_rule),
         device=device,
         seed=args.seed,
         verbose=not args.quiet,
@@ -130,6 +144,7 @@ def main():
             "encoder_state_dict": encoder.state_dict(),
             "weighting_state_dict": weighting_net.state_dict(),
             "held_in": held_in,
+            "action_rule": args.action_rule,
             "embed_dim": args.embed_dim,
             "encoder_hidden": encoder.hidden_size,
             **encoder_kwargs,

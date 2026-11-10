@@ -50,10 +50,10 @@
 | static_ensemble | 106.0 | 0.0 | 1 |
 | actor_critic-sp/learned_static_ensemble | 103.5 | 1.2 | 3 |
 | mappo | 99.3 | 1.5 | 5 |
+| best_fixed_sub_policy | 99.0 | 0.0 | 1 |
 | static_ensemble_vote | 95.8 | 0.0 | 1 |
 | cole_s75_argmax | 95.2 | 22.5 | 5 |
 | static_ensemble_argmax | 92.2 | 0.0 | 1 |
-| best_fixed_sub_policy | 92.0 | 0.0 | 1 |
 | mappo_argmax | 91.6 | 5.1 | 5 |
 | e3t | 90.4 | 7.3 | 5 |
 | e3t_argmax | 77.8 | 11.2 | 5 |
@@ -76,8 +76,8 @@
 | hsp_s36_argmax | 132.1 | 6.0 | 5 |
 | mep_s36 | 131.7 | 26.4 | 5 |
 | hsp_s36 | 131.7 | 8.5 | 5 |
+| best_fixed_sub_policy | 130.9 | 0.0 | 1 |
 | actor_critic-sp/learned_static_ensemble | 128.7 | 0.7 | 3 |
-| best_fixed_sub_policy | 126.6 | 0.0 | 1 |
 | static_ensemble | 126.3 | 0.0 | 1 |
 | mappo | 125.2 | 30.8 | 5 |
 | mappo_argmax | 119.9 | 30.8 | 5 |
@@ -117,6 +117,8 @@
 | actor_critic-sp/adaptive_ensemble | mep_s36_argmax | -43.3 | [-57.2, -26.1] | 2/20 |
 | actor_critic-sp/adaptive_ensemble | cole_s75_argmax | -28.7 | [-45.2, -9.3] | 3/20 |
 | actor_critic-sp/adaptive_ensemble | e3t_argmax | -31.1 | [-48.5, -13.0] | 4/20 |
+| actor_critic-sp/adaptive_ensemble | best_baseline | -49.0 | [-62.0, -32.4] | 1/20 |
+| actor_critic-sp/adaptive_ensemble | best_baseline_argmax | -45.7 | [-59.2, -30.3] | 2/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | actor_critic-sp/learned_static_ensemble | +7.9 | [+2.9, +13.3] | 15/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | actor_critic-sp/top_learned_sub_policy | +17.3 | [+6.4, +31.8] | 16/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | static_ensemble | +9.3 | [+3.4, +15.5] | 16/20 |
@@ -138,6 +140,8 @@
 | actor_critic-sp/adaptive_ensemble_argmax | mep_s36_argmax | -48.8 | [-63.7, -30.1] | 1/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | cole_s75_argmax | -34.2 | [-52.1, -13.4] | 3/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | e3t_argmax | -36.6 | [-56.0, -17.0] | 2/20 |
+| actor_critic-sp/adaptive_ensemble_argmax | best_baseline | -54.5 | [-68.7, -36.7] | 1/20 |
+| actor_critic-sp/adaptive_ensemble_argmax | best_baseline_argmax | -51.2 | [-65.8, -34.5] | 1/20 |
 | actor_critic-sp/policy_selection | actor_critic-sp/learned_static_ensemble | +8.0 | [-0.5, +16.5] | 12/20 |
 | actor_critic-sp/policy_selection | actor_critic-sp/top_learned_sub_policy | +17.3 | [+4.1, +32.5] | 14/20 |
 | actor_critic-sp/policy_selection | static_ensemble | +9.3 | [+0.3, +18.5] | 13/20 |
@@ -159,6 +163,8 @@
 | actor_critic-sp/policy_selection | mep_s36_argmax | -48.8 | [-62.6, -32.5] | 1/20 |
 | actor_critic-sp/policy_selection | cole_s75_argmax | -34.2 | [-50.5, -15.6] | 2/20 |
 | actor_critic-sp/policy_selection | e3t_argmax | -36.6 | [-53.6, -18.9] | 3/20 |
+| actor_critic-sp/policy_selection | best_baseline | -54.5 | [-67.0, -39.2] | 1/20 |
+| actor_critic-sp/policy_selection | best_baseline_argmax | -51.2 | [-64.5, -36.5] | 1/20 |
 | actor_critic-sp/learned_static_ensemble | static_ensemble | +1.4 | [-0.0, +2.8] | 14/20 |
 | actor_critic-sp/learned_static_ensemble | static_ensemble_argmax | +0.7 | [-3.4, +5.3] | 11/20 |
 | actor_critic-sp/learned_static_ensemble | single_sub_policy | +10.1 | [+6.4, +14.5] | 20/20 |
@@ -178,5 +184,7 @@
 | actor_critic-sp/learned_static_ensemble | mep_s36_argmax | -56.7 | [-72.4, -38.6] | 2/20 |
 | actor_critic-sp/learned_static_ensemble | cole_s75_argmax | -42.1 | [-61.4, -22.2] | 3/20 |
 | actor_critic-sp/learned_static_ensemble | e3t_argmax | -44.5 | [-65.9, -24.4] | 2/20 |
+| actor_critic-sp/learned_static_ensemble | best_baseline | -62.4 | [-77.4, -45.4] | 0/20 |
+| actor_critic-sp/learned_static_ensemble | best_baseline_argmax | -59.2 | [-75.3, -41.2] | 1/20 |
 
 Saved to /cmlscratch/kpowell1/adhoc_teamwork/runs/random3/traj-new10/analysis

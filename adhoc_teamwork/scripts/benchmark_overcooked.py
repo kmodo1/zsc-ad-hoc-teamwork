@@ -13,11 +13,17 @@ Three kinds of method, split so each is only evaluated as often as needed:
   --what baselines    MAPPO, TrajeDi, HSP, FCP, MEP, COLE, E3T (once per layout).
   --what ensemble     the trained adaptive ensemble, the policy-selection
                       baseline, and learned_static_ensemble (once per training
-                      run). The latter fixes the weights at their average over
-                      the *training* partners, separating the benefit of
-                      adapting to the partner from the benefit of simply
-                      favoring the better sub-policies. Also records how the
-                      weights evolve over an episode against each partner.
+                      run), each sampling and with argmax actions. The latter
+                      fixes the weights at their average over the *training*
+                      partners, separating the benefit of adapting to the
+                      partner from the benefit of simply favoring the better
+                      sub-policies. Also records how the weights evolve over an
+                      episode against each partner.
+
+Baselines are evaluated on every partner group; anything built from a population
+only on the groups held out from it (``experiment.heldout_partner_groups``).
+Each partner's episode seeds depend only on its place in
+``experiment.all_partner_groups``, so they are the same in every file.
 
 Resumable; see evaluation/benchmark.py.
 """
@@ -92,7 +98,8 @@ def main():
     device = torch.device(args.device)
     load = functools.partial(load_pool, layout=args.layout, pool_root=args.pool_root, device=device)
 
-    partner_groups = experiment.heldout_partner_groups(args.population, args.layout)
+    all_groups = experiment.all_partner_groups(args.layout)
+    partner_groups = all_groups if args.what == "baselines" else experiment.heldout_partner_groups(args.population, args.layout)
     if args.partner_groups:
         partner_groups = {group: partner_groups[group] for group in args.partner_groups}
     partner_paths = {}
@@ -125,6 +132,7 @@ def main():
                 "adaptive_ensemble": functools.partial(AdaptiveEnsembleAgent, *shared, device=device),
                 "adaptive_ensemble_argmax": functools.partial(AdaptiveEnsembleAgent, *shared, device=device, argmax_actions=True),
                 "policy_selection": functools.partial(PolicySelectionAgent, *shared, device=device),
+                "policy_selection_argmax": functools.partial(PolicySelectionAgent, *shared, device=device, argmax_actions=True),
             }
 
     vec_env = VecEnv(lambda: make_overcooked_env(args.layout), args.n_episodes)
@@ -133,9 +141,12 @@ def main():
         weights = mean_weights_on_training_partners(args, methods["adaptive_ensemble"], vec_env, device, load)
         print(f"[benchmark] learned static weights: {np.round(weights, 3).tolist()}", flush=True)
         methods["learned_static_ensemble"] = functools.partial(StaticEnsembleAgent, sub_policies, weights=weights, device=device)
+        methods["learned_static_ensemble_argmax"] = functools.partial(StaticEnsembleAgent, sub_policies, weights=weights, device=device, argmax_actions=True)
     with open(os.path.join(args.out, "partner_groups.json"), "w") as f:
         json.dump({group: sorted(paths) for group, paths in partner_groups.items()}, f, indent=2)
-    run_benchmark(vec_env, methods, partners, os.path.join(args.out, "results.jsonl"), seed=args.seed)
+    order = [name for group in all_groups.values() for name in group]
+    partner_seeds = {name: args.seed + 1000 * order.index(name) for name in partners}
+    run_benchmark(vec_env, methods, partners, os.path.join(args.out, "results.jsonl"), seed=args.seed, partner_seeds=partner_seeds)
 
     if args.what == "ensemble":
         weight_traces = {}

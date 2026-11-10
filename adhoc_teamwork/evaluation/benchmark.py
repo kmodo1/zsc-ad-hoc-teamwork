@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Callable, Dict, Iterable, List, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -42,14 +42,17 @@ def run_benchmark(
     out_path: str,
     seed: int = 0,
     verbose: bool = True,
+    partner_seeds: Optional[Dict[str, int]] = None,
 ) -> List[dict]:
     """Returns one row per (method, partner, position). The same episode seed
     is used for every method on a given (partner, position), so comparisons
-    between methods share partner sampling noise as far as possible.
+    between methods share partner sampling noise as far as possible. By default
+    a partner's seed follows its place in ``partners``; ``partner_seeds`` fixes
+    them instead, so they agree between files that evaluate different partners.
     """
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     done = _load_done(out_path)
-    partner_seed = {name: seed + 1000 * i for i, name in enumerate(partners)}
+    partner_seed = partner_seeds or {name: seed + 1000 * i for i, name in enumerate(partners)}
     with open(out_path, "a") as f:
         # After a line truncated by preemption, start a new line; otherwise the
         # next row would be glued onto the fragment and lost as well.

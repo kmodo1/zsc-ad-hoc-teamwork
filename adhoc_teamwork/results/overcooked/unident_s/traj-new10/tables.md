@@ -80,10 +80,10 @@
 | mappo_argmax | 430.6 | 46.6 | 5 |
 | actor_critic-sp/adaptive_ensemble | 430.2 | 6.8 | 3 |
 | actor_critic-sp/policy_selection | 429.8 | 3.5 | 3 |
+| best_fixed_sub_policy | 429.5 | 0.0 | 1 |
 | actor_critic-sp/learned_static_ensemble | 422.4 | 9.8 | 3 |
 | actor_critic-sp/top_learned_sub_policy | 420.2 | 2.1 | 3 |
 | static_ensemble | 412.5 | 0.0 | 1 |
-| best_fixed_sub_policy | 410.9 | 0.0 | 1 |
 | actor_critic-sp/adaptive_ensemble_argmax | 410.9 | 3.7 | 3 |
 | single_sub_policy_argmax | 404.9 | 17.5 | 10 |
 | single_sub_policy | 404.4 | 23.7 | 10 |
@@ -117,6 +117,8 @@
 | actor_critic-sp/adaptive_ensemble | mep_s36_argmax | -133.6 | [-186.5, -80.6] | 1/20 |
 | actor_critic-sp/adaptive_ensemble | cole_s75_argmax | -65.8 | [-124.2, -4.6] | 4/20 |
 | actor_critic-sp/adaptive_ensemble | e3t_argmax | -93.7 | [-154.5, -32.7] | 3/20 |
+| actor_critic-sp/adaptive_ensemble | best_baseline | -130.6 | [-183.4, -77.7] | 1/20 |
+| actor_critic-sp/adaptive_ensemble | best_baseline_argmax | -133.6 | [-186.5, -80.6] | 1/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | actor_critic-sp/learned_static_ensemble | -0.3 | [-13.1, +11.2] | 9/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | actor_critic-sp/top_learned_sub_policy | -3.7 | [-15.7, +7.3] | 7/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | static_ensemble | +0.1 | [-12.4, +10.2] | 11/20 |
@@ -138,6 +140,8 @@
 | actor_critic-sp/adaptive_ensemble_argmax | mep_s36_argmax | -134.5 | [-193.3, -75.4] | 1/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | cole_s75_argmax | -66.7 | [-133.7, +1.8] | 4/20 |
 | actor_critic-sp/adaptive_ensemble_argmax | e3t_argmax | -94.6 | [-162.7, -26.7] | 5/20 |
+| actor_critic-sp/adaptive_ensemble_argmax | best_baseline | -131.5 | [-190.3, -72.9] | 1/20 |
+| actor_critic-sp/adaptive_ensemble_argmax | best_baseline_argmax | -134.5 | [-193.3, -75.4] | 1/20 |
 | actor_critic-sp/policy_selection | actor_critic-sp/learned_static_ensemble | +3.0 | [+1.5, +4.6] | 14/20 |
 | actor_critic-sp/policy_selection | actor_critic-sp/top_learned_sub_policy | -0.4 | [-1.2, +0.3] | 7/20 |
 | actor_critic-sp/policy_selection | static_ensemble | +3.4 | [+0.3, +6.8] | 12/20 |
@@ -159,6 +163,8 @@
 | actor_critic-sp/policy_selection | mep_s36_argmax | -131.2 | [-184.8, -77.4] | 1/20 |
 | actor_critic-sp/policy_selection | cole_s75_argmax | -63.4 | [-122.8, -1.3] | 4/20 |
 | actor_critic-sp/policy_selection | e3t_argmax | -91.3 | [-152.7, -29.2] | 3/20 |
+| actor_critic-sp/policy_selection | best_baseline | -128.2 | [-181.8, -74.3] | 1/20 |
+| actor_critic-sp/policy_selection | best_baseline_argmax | -131.2 | [-184.8, -77.4] | 1/20 |
 | actor_critic-sp/learned_static_ensemble | static_ensemble | +0.4 | [-2.0, +2.7] | 8/20 |
 | actor_critic-sp/learned_static_ensemble | static_ensemble_argmax | +2.5 | [-7.3, +15.6] | 7/20 |
 | actor_critic-sp/learned_static_ensemble | single_sub_policy | -1.0 | [-2.7, +0.3] | 8/20 |
@@ -178,5 +184,7 @@
 | actor_critic-sp/learned_static_ensemble | mep_s36_argmax | -134.2 | [-186.9, -81.4] | 1/20 |
 | actor_critic-sp/learned_static_ensemble | cole_s75_argmax | -66.4 | [-124.6, -5.3] | 4/20 |
 | actor_critic-sp/learned_static_ensemble | e3t_argmax | -94.3 | [-154.9, -33.3] | 3/20 |
+| actor_critic-sp/learned_static_ensemble | best_baseline | -131.2 | [-183.8, -78.6] | 1/20 |
+| actor_critic-sp/learned_static_ensemble | best_baseline_argmax | -134.2 | [-186.9, -81.4] | 1/20 |
 
 Saved to /cmlscratch/kpowell1/adhoc_teamwork/runs/unident_s/traj-new10/analysis

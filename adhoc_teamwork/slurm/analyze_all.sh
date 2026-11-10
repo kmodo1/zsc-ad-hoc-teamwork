@@ -4,7 +4,7 @@
 #   sbatch -J adhoc-analyze --gres=gpu:0 --ntasks=2 adhoc_teamwork/slurm/run.sbatch bash adhoc_teamwork/slurm/analyze_all.sh
 R=$ADHOC_SCRATCH/runs; D=$ADHOC_REPO/adhoc_teamwork/results/overcooked
 for layout in unident_s random0_medium random3; do
-    for pop in traj-full10 traj-s10 s2-mix hsp-w1 hsp-w1-new traj-new10; do
+    for pop in traj-full10 traj-s10 s2-mix hsp-w1 hsp-w1-new traj-new10 mix-g8s4 mix-g4s8 mix-g4s4t4; do
         [ -f $R/$layout/$pop/population_eval/results.jsonl ] || continue
         python -m adhoc_teamwork.scripts.analyze_overcooked --root $R --layout $layout --population $pop > $R/$layout/$pop/analysis_output.md 2>&1 || { echo "FAILED $layout $pop"; tail -3 $R/$layout/$pop/analysis_output.md; continue; }
         mkdir -p $D/$layout/$pop
