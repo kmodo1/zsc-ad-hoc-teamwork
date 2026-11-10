@@ -35,6 +35,7 @@ TRAIN_METRICS = {
     "weight_entropy": "weights/entropy",
     "weight_within_episode_std": "weights/std_within_episode",
     "weight_between_episode_std": "weights/std_between_episodes",
+    "temperature": "train/temperature",
 }
 
 
@@ -86,7 +87,7 @@ def sync_training_run(run_dir: str, root: str, args, state: dict) -> None:
     )  # fmt: skip
     stats = ckpt["stats"]
     for i in range(run.starting_step, ckpt["iteration"]):
-        run.log({name: stats[key][i] for key, name in TRAIN_METRICS.items() if i < len(stats[key])}, step=i)
+        run.log({name: stats[key][i] for key, name in TRAIN_METRICS.items() if i < len(stats.get(key, []))}, step=i)
     run.summary.update(summary)
     run.finish()
     state[relative] = signature

@@ -84,6 +84,9 @@ def main():
     parser.add_argument("--advantage", choices=["reinforce", "actor_critic"], default="reinforce")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-entropy-coef", type=float, default=0.01)
+    parser.add_argument("--temperature-start", type=float, default=1.0, help="actions are sampled from softmax(log(mixture) / T); T at the first iteration")
+    parser.add_argument("--temperature-end", type=float, default=1.0, help="T at the end of the anneal. Below 1 trains towards the argmax rule; 1 (default) samples from the mixture")
+    parser.add_argument("--temperature-anneal-fraction", type=float, default=1.0, help="fraction of the iterations over which T moves linearly from start to end")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--quiet", action="store_true")
@@ -117,7 +120,15 @@ def main():
         n_iterations=args.n_iterations,
         episodes_per_iteration=args.episodes_per_iteration,
         partners_per_iteration=args.partners_per_iteration,
-        cfg=EnsembleTrainConfig(lr=args.lr, weight_entropy_coef=args.weight_entropy_coef, advantage=args.advantage, reward_scale=reward_scale),
+        cfg=EnsembleTrainConfig(
+            lr=args.lr,
+            weight_entropy_coef=args.weight_entropy_coef,
+            advantage=args.advantage,
+            reward_scale=reward_scale,
+            temperature_start=args.temperature_start,
+            temperature_end=args.temperature_end,
+            temperature_anneal_fraction=args.temperature_anneal_fraction,
+        ),
         device=device,
         seed=args.seed,
         verbose=not args.quiet,
