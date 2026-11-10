@@ -65,6 +65,17 @@ def complete_partners(partners: List[str], scores: Dict[str, List[float]]) -> bo
     return all(p in scores for p in partners) and len({len(scores[p]) for p in partners}) == 1
 
 
+def _rounded(x, digits: int = 3):
+    """Keeps summaries small enough to commit."""
+    if isinstance(x, float):
+        return round(x, digits)
+    if isinstance(x, dict):
+        return {k: _rounded(v, digits) for k, v in x.items()}
+    if isinstance(x, list):
+        return [_rounded(v, digits) for v in x]
+    return x
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", required=True)
@@ -150,7 +161,8 @@ def main():
                     for alias, ref in references.items()
                     if complete_partners(partners, group_scores[ref])
                 }
-    summary["comparisons"] = summary["group_comparisons"]["biased"]
+    # The primary group's comparisons keep their original key, and are not stored twice.
+    summary["comparisons"] = summary["group_comparisons"].pop("biased")
     primary = partner_groups["biased"]
     # Per-partner means (over seeds) of every family with complete results, so
     # that scripts/report_tables.py can pair any two of them, e.g. two training arms.
@@ -177,7 +189,7 @@ def main():
                     summary["ablations"][f"{arm}/{method}"] = paired_bootstrap_difference(mean_over_members(complete), mean_over_members(ablated), primary)
 
     with open(os.path.join(out, "summary.json"), "w") as f:
-        json.dump(summary, f, indent=2)
+        json.dump(_rounded(summary), f, indent=1)
     biased_rows = summary["groups"]["biased"]
     steps = {
         "means": {f: biased_rows[f]["mean"] for f in POPULATION_FAMILIES if f in biased_rows},

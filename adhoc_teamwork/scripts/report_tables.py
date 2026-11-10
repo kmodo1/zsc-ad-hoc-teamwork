@@ -77,8 +77,8 @@ class Results:
 class Table:
     """A markdown table whose difference cells are Holm-adjusted together."""
 
-    def __init__(self, title: str, header: Sequence[str], note: str = ""):
-        self.title, self.header, self.note = title, list(header), note
+    def __init__(self, title: str, header: Sequence[str], note: str = "", text_columns: int = 2):
+        self.title, self.header, self.note, self.text_columns = title, list(header), note, text_columns
         self.rows: List[list] = []
 
     def add(self, *cells) -> None:
@@ -90,7 +90,7 @@ class Table:
         lines = [f"### {self.title}", ""]
         if self.note:
             lines += [self.note, ""]
-        lines += ["| " + " | ".join(self.header) + " |", "|" + "|".join("---" if j == 0 else "---:" for j in range(len(self.header))) + "|"]
+        lines += ["| " + " | ".join(self.header) + " |", "|" + "|".join("---" if j < self.text_columns else "---:" for j in range(len(self.header))) + "|"]
         for i, row in enumerate(self.rows):
             cells = []
             for j, c in enumerate(row):
@@ -172,6 +172,7 @@ def other_groups(r: Results) -> Table:
         ["Layout", "Population", "Partners", "Adaptive", "Against uniform", "Best baseline", "Against best baseline"],
         "Each population's main training run. A group is left out where it overlaps the population or what its members "
         "trained with, and a baseline is left out of a group it trained with.",
+        text_columns=3,
     )
     for layout in LAYOUTS:
         for population, arm in MAIN_ARMS.items():
