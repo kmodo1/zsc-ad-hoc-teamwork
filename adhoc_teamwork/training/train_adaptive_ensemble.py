@@ -19,13 +19,6 @@ estimators are available (``EnsembleTrainConfig.advantage``):
 * ``"actor_critic"``: per-step GAE advantages, from a value head on the
   partner embedding. Lower variance, and predicting return from the embedding
   gives the encoder a reason to capture what matters about the partner.
-
-Evaluation can take the argmax of the mixture (Section 4), which has no
-gradient. To train weights for that rule, actions are sampled from the mixture
-sharpened by a temperature, ``softmax(log(mix) / T)``, with T annealed from
-``temperature_start`` towards 0: still a proper policy gradient, and it
-approaches the argmax policy as T falls. T = 1 throughout (the default) is
-plain sampling from the mixture.
 """
 
 from __future__ import annotations
@@ -58,19 +51,6 @@ class EnsembleTrainConfig:
     # Rewards are divided by this before computing advantages, so loss scales
     # do not depend on the environment's reward units.
     reward_scale: float = 1.0
-    # Actions are sampled from softmax(log(mix) / temperature). The temperature
-    # moves linearly from start to end over the first temperature_anneal_fraction
-    # of training, then stays at end. 1.0 samples from the mixture itself; lower
-    # values approach the argmax rule used at evaluation.
-    temperature_start: float = 1.0
-    temperature_end: float = 1.0
-    temperature_anneal_fraction: float = 1.0
-
-    def temperature(self, iteration: int, n_iterations: int) -> float:
-        """Temperature of 0-based ``iteration`` out of ``n_iterations``."""
-        anneal_iterations = self.temperature_anneal_fraction * (n_iterations - 1)
-        progress = 1.0 if anneal_iterations <= 0 else min(1.0, iteration / anneal_iterations)
-        return self.temperature_start + progress * (self.temperature_end - self.temperature_start)
 
 
 @dataclass
@@ -80,7 +60,6 @@ class EnsembleTrainStats:
     weight_entropy: List[float] = field(default_factory=list)  # mean H(w_t), nats
     weight_within_episode_std: List[float] = field(default_factory=list)  # how much weights move during an episode
     weight_between_episode_std: List[float] = field(default_factory=list)  # how much they differ between episodes
-    temperature: List[float] = field(default_factory=list)  # action-sampling temperature of each iteration
 
 
 @dataclass
@@ -111,20 +90,6 @@ def assign_partners(partners: List[Agent], n_envs: int) -> Tuple[List[Tuple[Agen
     return groups, ego_positions
 
 
-def tempered_distribution(combined: torch.Tensor, temperature: float) -> Tuple[torch.Tensor, torch.Tensor]:
-    """The behavior policy at ``temperature``: (probabilities, log-probabilities)
-    of softmax(log(combined) / temperature), both (n, A) and differentiable in
-    ``combined``. Actions the mixture gives zero probability keep zero.
-    """
-    if temperature <= 0:
-        raise ValueError(f"temperature must be positive, got {temperature}")
-    if temperature == 1.0:  # the mixture itself, with no renormalization rounding
-        return combined, combined.clamp_min(1e-8).log()
-    logits = combined.clamp_min(1e-8).log() / temperature
-    log_probs = torch.log_softmax(logits.masked_fill(combined <= 0, float("-inf")), dim=-1)
-    return log_probs.exp(), log_probs
-
-
 def collect_rollout(
     vec_env: VecEnv,
     sub_policies: list,
@@ -134,10 +99,8 @@ def collect_rollout(
     groups: List[Tuple[Agent, np.ndarray]],
     ego_positions: np.ndarray,
     device: torch.device,
-    temperature: float = 1.0,
 ) -> _Rollout:
-    """Play one batch of episodes with the differentiable ensemble, sampling
-    its actions from :func:`tempered_distribution` at ``temperature``."""
+    """Play one batch of episodes with the differentiable ensemble."""
     n = vec_env.n
     envs = np.arange(n)
     partner_positions = 1 - ego_positions
@@ -158,10 +121,9 @@ def collect_rollout(
         with torch.no_grad():
             sub_probs = sub_policy_probs(sub_policies, sub_rnn_states, ego_obs, ego_legal)
         combined = mix(weights, sub_probs)
-        action_probs, action_log_probs = tempered_distribution(combined, temperature)
-        ego_actions_t = torch.multinomial(action_probs.detach(), 1).squeeze(-1)
+        ego_actions_t = torch.multinomial(combined.detach(), 1).squeeze(-1)
 
-        log_probs.append(action_log_probs.gather(1, ego_actions_t.unsqueeze(1)).squeeze(1))
+        log_probs.append(combined.gather(1, ego_actions_t.unsqueeze(1)).squeeze(1).clamp_min(1e-8).log())
         entropies.append(-(weights.clamp_min(1e-8) * weights.clamp_min(1e-8).log()).sum(dim=-1))
         values.append(value_head(embedding).squeeze(-1))
         weight_history.append(weights.detach().cpu().numpy())
@@ -258,9 +220,7 @@ def train_adaptive_ensemble(
     parameters receive no gradient). ``env`` is a :class:`TwoAgentEnv` or a
     callable constructing one. With ``checkpoint_path``, training resumes from
     that file if it exists and saves to it every ``checkpoint_every``
-    iterations. The sampling temperature depends only on the iteration number
-    and ``n_iterations``, so a resumed run continues the same schedule.
-    Returns (encoder, weighting_net, EnsembleTrainStats).
+    iterations. Returns (encoder, weighting_net, EnsembleTrainStats).
     """
     cfg = cfg or EnsembleTrainConfig()
     torch.manual_seed(seed)
@@ -303,8 +263,7 @@ def train_adaptive_ensemble(
     for it in range(start_iteration, n_iterations):
         partners = [partner_sampler() for _ in range(partners_per_iteration)]
         groups, ego_positions = assign_partners(partners, vec_env.n)
-        temperature = cfg.temperature(it, n_iterations)
-        rollout = collect_rollout(vec_env, sub_policies, encoder, weighting_net, value_head, groups, ego_positions, device, temperature)
+        rollout = collect_rollout(vec_env, sub_policies, encoder, weighting_net, value_head, groups, ego_positions, device)
         loss = ensemble_loss(rollout, baseline, cfg, device)
         optimizer.zero_grad()
         loss.backward()
@@ -319,12 +278,11 @@ def train_adaptive_ensemble(
         stats.weight_entropy.append(float(rollout.weight_entropy.mean().item()))
         stats.weight_within_episode_std.append(float(rollout.weights.std(axis=0).mean()))
         stats.weight_between_episode_std.append(float(rollout.weights.mean(axis=0).std(axis=0).mean()))
-        stats.temperature.append(temperature)
 
         if verbose and (it % log_every == 0 or it == n_iterations - 1):
             print(
                 f"[adaptive-ensemble] iter {it:4d}  return={mean_return:7.2f}  baseline={baseline:6.2f}  loss={loss.item():.3f}  "
-                f"H(w)={stats.weight_entropy[-1]:.3f}  T={temperature:.3f}  std_within={stats.weight_within_episode_std[-1]:.4f}  std_between={stats.weight_between_episode_std[-1]:.4f}",
+                f"H(w)={stats.weight_entropy[-1]:.3f}  std_within={stats.weight_within_episode_std[-1]:.4f}  std_between={stats.weight_between_episode_std[-1]:.4f}",
                 flush=True,
             )
         if checkpoint_path and ((it + 1) % checkpoint_every == 0 or it == n_iterations - 1):

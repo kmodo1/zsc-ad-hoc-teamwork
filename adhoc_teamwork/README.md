@@ -95,7 +95,7 @@ real, larger-scale runs on the UMIACS cluster.
 pip install pytest
 pytest adhoc_teamwork/tests -q
 ```
-114 unit + integration tests (40 of them need the `zsceval` environment and
+110 unit + integration tests (40 of them need the `zsceval` environment and
 skip themselves without it, and some of those also need a policy pool) cover:
 the real-Overcooked adapter's contract and the ZSC-Eval policy wrapper;
 that evaluation partners are disjoint from training partners and sub-policies;
@@ -167,7 +167,7 @@ sbatch -J adhoc-validate adhoc_teamwork/slurm/run.sbatch \
     python -m adhoc_teamwork.scripts.validate_overcooked --layouts unident_s --out $ADHOC_SCRATCH/runs/validation
 
 # Evaluation jobs, plus a train-then-evaluate chain per seed. See the script
-# header for options, e.g. ARMS="actor_critic:sp actor_critic:sp:memoryless actor_critic:sp:argmaxtrain".
+# header for options, e.g. ARMS="actor_critic:sp actor_critic:sp:memoryless".
 bash adhoc_teamwork/slurm/submit_overcooked.sh
 
 # Tables and plots. Safe to run while jobs are still going. analyze_all.sh does
@@ -210,9 +210,7 @@ files the jobs already write, so training has no dependency on wandb.
 
 ## Running real Overcooked locally
 
-The cluster is not needed for evaluation or the tests. The same steps work on an Apple
-Silicon Mac with plain `torch torchvision` in place of the CUDA index and `+cu128` pins
-(the tests that need no policy pool pass). On a Linux or WSL machine with
+The cluster is not needed for evaluation or the tests. On a Linux or WSL machine with
 [uv](https://docs.astral.sh/uv/), from the repository root:
 
 ```bash
@@ -535,14 +533,10 @@ fidelity. Two of the populations were also retrained here with ZSC-Eval's traine
 
 Not done:
 
-- **Training with the action rule Section 4 describes.** The reported weighting networks
-  trained by sampling from the mixture, but Section 4's method takes the argmax, so argmax
-  results use weights tuned for sampled behavior. The fix is implemented and unit-tested but
-  has not been run on real Overcooked: `--temperature-end` samples training actions from
-  `softmax(log(mixture) / T)` with T annealed from 1 (argmax itself has no gradient), and
-  the `argmaxtrain` arm option runs it next to the existing arm, e.g.
-  `LAYOUTS="random0_medium random3" POPULATION=s2-mix ARMS=actor_critic:sp+biased:argmaxtrain ONLY=train bash adhoc_teamwork/slurm/submit_overcooked.sh`.
-  `analyze_overcooked` then prints the paired difference from the arm trained at T = 1.
+- **Training with the action rule Section 4 describes.** The weighting network trains by
+  sampling from the mixture (`training/train_adaptive_ensemble.py`), but Section 4's method
+  takes the argmax, so argmax results use weights tuned for sampled behavior. Its effect
+  has not been measured.
 - **Policy selection with argmax.** It has only run with sampled actions, so it should
   not be compared with the argmax ensembles.
 - **Retraining `s2-mix`.** Each stage-2 agent takes 100M steps, so only the stage-1

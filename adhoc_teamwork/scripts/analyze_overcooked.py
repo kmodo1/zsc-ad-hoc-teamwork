@@ -139,19 +139,6 @@ def main():
                 if complete and ablated and complete_partners(primary, complete) and complete_partners(primary, ablated):
                     summary["ablations"][f"{arm}/{method}"] = paired_bootstrap_difference(mean_over_members(complete), mean_over_members(ablated), primary)
 
-    # Training for the argmax rule: the same arm with the sampling temperature
-    # annealed, minus the arm trained at temperature 1.
-    summary["argmaxtrain"] = {}
-    suffix = "-argmaxtrain"
-    for arm in arms:
-        base = arm[: -len(suffix)]
-        if not arm.endswith(suffix) or base not in arms:
-            continue
-        for method in ("adaptive_ensemble", "adaptive_ensemble_argmax", "policy_selection", "learned_static_ensemble"):
-            annealed, plain = scores.get(f"{arm}/{method}"), scores.get(f"{base}/{method}")
-            if annealed and plain and complete_partners(primary, annealed) and complete_partners(primary, plain):
-                summary["argmaxtrain"][f"{arm}/{method}"] = paired_bootstrap_difference(mean_over_members(annealed), mean_over_members(plain), primary)
-
     with open(os.path.join(out, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
     biased_rows = summary["groups"]["biased"]
@@ -180,12 +167,6 @@ def main():
         print("\n## Ablations on biased partners (complete encoder - ablated, 95% bootstrap CI over distinct partner agents)\n")
         print("| ablated run | difference | 95% CI | partners better |\n|---|---:|---|---:|")
         for family, c in summary["ablations"].items():
-            print(f"| {family} | {c['mean_difference']:+.1f} | [{c['ci95_low']:+.1f}, {c['ci95_high']:+.1f}] | {c['partners_better']}/{c['n_partners']} |")
-
-    if summary["argmaxtrain"]:
-        print("\n## Annealed-temperature training on biased partners (argmaxtrain arm - the same arm trained at temperature 1, 95% bootstrap CI over distinct partner agents)\n")
-        print("| argmaxtrain run | difference | 95% CI | partners better |\n|---|---:|---|---:|")
-        for family, c in summary["argmaxtrain"].items():
             print(f"| {family} | {c['mean_difference']:+.1f} | [{c['ci95_low']:+.1f}, {c['ci95_high']:+.1f}] | {c['partners_better']}/{c['n_partners']} |")
 
     plot_family_comparison(summary["groups"]["biased"], os.path.join(out, "method_comparison_biased.png"), title=f"{args.layout}: mean return with held-out biased partners")
