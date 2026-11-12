@@ -3,10 +3,13 @@
 (written by ``slurm/analyze_all.sh``).
 
 Each cell that compares two methods is a mean paired difference over a group's
-partners, with a 95% bootstrap CI over the distinct partner agents. Each table
-is one family of comparisons: its p-values (exact sign-flip tests over the same
-agents) are Holm-adjusted together, and a cell marked † is significant at 0.05
-after that correction. Cells whose runs have not finished are shown as "-".
+partners, with a 95% bootstrap CI over the distinct partner agents. Each column
+of a table asks one question across layouts and populations, so it is one family
+of comparisons: its p-values (exact sign-flip tests over the same agents) are
+Holm-adjusted together, and a cell marked † is significant at 0.05 after that
+correction. With 10 agents no p-value is below 2/1024, so a whole table as one
+family could leave nothing significant by construction. Cells whose runs have
+not finished are shown as "-".
 
 Usage:
     python -m adhoc_teamwork.scripts.report_tables [--results adhoc_teamwork/results/overcooked] [--only NAME ...]
@@ -47,6 +50,10 @@ class Results:
         s = self.summary(layout, population)
         return s["partner_groups"].get(group) if s and "partner_groups" in s else None
 
+    def partners_by_group(self, layout: str, population: str) -> Dict[str, List[str]]:
+        s = self.summary(layout, population)
+        return s.get("partner_groups", {}) if s else {}
+
     def scores(self, layout: str, population: str, family: str, group: str) -> Optional[Dict[str, float]]:
         """{partner: mean over seeds}, or None unless every partner of the group has one."""
         partners = self.partners(layout, population, group)
@@ -75,7 +82,7 @@ class Results:
 
 
 class Table:
-    """A markdown table whose difference cells are Holm-adjusted together."""
+    """A markdown table whose difference cells are Holm-adjusted within each column."""
 
     def __init__(self, title: str, header: Sequence[str], note: str = "", text_columns: int = 2):
         self.title, self.header, self.note, self.text_columns = title, list(header), note, text_columns
@@ -86,7 +93,9 @@ class Table:
 
     def render(self) -> str:
         diffs = {(i, j): c for i, row in enumerate(self.rows) for j, c in enumerate(row) if isinstance(c, dict)}
-        adjusted = holm_adjust({k: c["p_value"] for k, c in diffs.items()})
+        adjusted = {}
+        for column in {j for _, j in diffs}:
+            adjusted.update(holm_adjust({k: c["p_value"] for k, c in diffs.items() if k[1] == column}))
         lines = [f"### {self.title}", ""]
         if self.note:
             lines += [self.note, ""]
@@ -103,7 +112,9 @@ class Table:
                     cells.append("-" if c is None else str(c))
             lines.append("| " + " | ".join(cells) + " |")
         lines.append("")
-        lines.append(f"{len(diffs)} comparisons; † = significant at 0.05 after Holm correction across this table.")
+        if diffs:
+            columns = len({j for _, j in diffs})
+            lines.append(f"† = significant at 0.05 after Holm correction within its column ({len(diffs)} comparisons in {columns} column{'s' if columns > 1 else ''}).")
         return "\n".join(lines) + "\n"
 
 
@@ -166,34 +177,38 @@ def training_partners(r: Results) -> Table:
     return t
 
 
-def other_groups(r: Results) -> Table:
-    t = Table(
-        "Other partner groups, argmax actions",
-        ["Layout", "Population", "Partners", "Adaptive", "Against uniform", "Best baseline", "Against best baseline"],
-        "Each population's main training run. A group is left out where it overlaps the population or what its members "
-        "trained with, and a baseline is left out of a group it trained with.",
-        text_columns=3,
+OTHER_GROUPS = ("mep", "self_play", "traj", "cole", "e3t")
+
+
+def other_groups(r: Results) -> List[Table]:
+    """The main runs on every held-out group but the biased one, argmax actions."""
+    note = (
+        "Each population's main training run, argmax actions. \"n/a\": the group overlaps the population or what its "
+        "members trained with."
+    )
+    against_uniform = Table("Other partner groups: adaptive against uniform weights", ["Layout", "Population"] + [GROUP_NAMES[g] for g in OTHER_GROUPS], note)
+    against_best = Table(
+        "Other partner groups: adaptive against the best baseline",
+        ["Layout", "Population"] + [GROUP_NAMES[g] for g in OTHER_GROUPS],
+        note + " Baselines that trained with a group's agents are left out of it (MAPPO and FCP for self-play, TrajeDi "
+        "for TrajeDi, E3T for E3T).",
     )
     for layout in LAYOUTS:
         for population, arm in MAIN_ARMS.items():
-            s = r.summary(layout, population)
-            if not s:
-                continue
-            for group in s["partner_groups"]:
-                if group == "biased":
+            groups = r.partners_by_group(layout, population)
+            ours = f"{arm}/adaptive_ensemble_argmax"
+            uniform_cells, best_cells = [], []
+            for g in OTHER_GROUPS:
+                if g not in groups:
+                    uniform_cells.append("n/a")
+                    best_cells.append("n/a")
                     continue
-                ours = f"{arm}/adaptive_ensemble_argmax"
-                best = r.best_baseline(layout, population, group, argmax=True)
-                t.add(
-                    code(layout),
-                    code(population),
-                    GROUP_NAMES[group],
-                    r.mean(layout, population, ours, group),
-                    r.difference(layout, population, ours, "static_ensemble_argmax", group),
-                    f"{best.removesuffix('_argmax')} {r.mean(layout, population, best, group):.1f}" if best and r.mean(layout, population, best, group) is not None else None,
-                    r.difference(layout, population, ours, best, group) if best else None,
-                )
-    return t
+                best = r.best_baseline(layout, population, g, argmax=True)
+                uniform_cells.append(r.difference(layout, population, ours, "static_ensemble_argmax", g))
+                best_cells.append(r.difference(layout, population, ours, best, g) if best else None)
+            against_uniform.add(code(layout), code(population), *uniform_cells)
+            against_best.add(code(layout), code(population), *best_cells)
+    return [against_uniform, against_best]
 
 
 def generator_transfer(r: Results) -> List[Table]:
@@ -232,9 +247,9 @@ def generator_transfer(r: Results) -> List[Table]:
 def action_rules(r: Results) -> Table:
     t = Table(
         "Training the way it acts",
-        ["Layout", "Population", "Ensemble, argmax", "Policy selection, sampled", "Policy selection, argmax"],
+        ["Layout", "Population", "Ensemble, argmax (noisy weights)", "Ensemble, argmax (annealed temperature)", "Policy selection, sampled", "Policy selection, argmax"],
         "Each cell: trained with the evaluation's action rule minus trained by sampling from the mixture, both evaluated "
-        "the same way, on the biased partners.",
+        "the same way, on the biased partners. The annealed rule was run on `s2-mix` only, on two layouts.",
     )
     for layout in LAYOUTS:
         for population, arm in MAIN_ARMS.items():
@@ -243,7 +258,12 @@ def action_rules(r: Results) -> Table:
                 code(population),
                 *[
                     r.difference(layout, population, f"{arm}-{rule}/{method}", f"{arm}/{method}")
-                    for rule, method in (("argmax", "adaptive_ensemble_argmax"), ("select", "policy_selection"), ("select_argmax", "policy_selection_argmax"))
+                    for rule, method in (
+                        ("argmax", "adaptive_ensemble_argmax"),
+                        ("anneal", "adaptive_ensemble_argmax"),
+                        ("select", "policy_selection"),
+                        ("select_argmax", "policy_selection_argmax"),
+                    )
                 ],
             )
     return t
@@ -273,8 +293,9 @@ def action_rule_returns(r: Results) -> Table:
 def policy_selection(r: Results) -> Table:
     t = Table(
         "Policy selection against the adaptive ensemble, argmax actions",
-        ["Layout", "Population", "Selection, trained sampling", "Selection, trained selecting", "Against the ensemble (both trained their own way)"],
-        "Mean return on the biased partners, then the selection agent trained by selecting minus the ensemble trained with argmax.",
+        ["Layout", "Population", "Selection", "Ensemble", "Ensemble minus selection"],
+        "Mean return on the biased partners. Both use the same trained network (each population's main run); selection "
+        "acts with the highest-weighted sub-policy, the ensemble with the weighted mixture.",
     )
     for layout in LAYOUTS:
         for population, arm in MAIN_ARMS.items():
@@ -282,8 +303,8 @@ def policy_selection(r: Results) -> Table:
                 code(layout),
                 code(population),
                 r.mean(layout, population, f"{arm}/policy_selection_argmax"),
-                r.mean(layout, population, f"{arm}-select_argmax/policy_selection_argmax"),
-                r.difference(layout, population, f"{arm}-select_argmax/policy_selection_argmax", f"{arm}-argmax/adaptive_ensemble_argmax"),
+                r.mean(layout, population, f"{arm}/adaptive_ensemble_argmax"),
+                r.difference(layout, population, f"{arm}/adaptive_ensemble_argmax", f"{arm}/policy_selection_argmax"),
             )
     return t
 
@@ -306,6 +327,30 @@ def mixed_populations(r: Results) -> Table:
                 r.difference(layout, population, f"{arm}/adaptive_ensemble_argmax", "static_ensemble_argmax"),
                 r.difference(layout, population, f"{arm}/adaptive_ensemble_argmax", best) if best else None,
             )
+    return t
+
+
+def mixed_populations_other_groups(r: Results) -> Table:
+    t = Table(
+        "Mixed populations on unseen generators, argmax actions",
+        ["Layout", "Generalists : specialists : TrajeDi", "MEP", "COLE", "E3T", "Mean against `s2-mix`"],
+        "Mean return of the adaptive ensemble (trained by sampling) on the groups every mix is held out from, then the "
+        "difference from `s2-mix` over all their partners together.",
+    )
+    groups = ("mep", "cole", "e3t")
+    for layout in LAYOUTS:
+        for population in MIXES:
+            arm = "actor_critic-sp+biased"
+            ours = f"{arm}/adaptive_ensemble_argmax"
+            pooled = {}
+            for g in groups:
+                a, b = r.scores(layout, population, ours, g), r.scores(layout, "s2-mix", ours, g)
+                if a is None or b is None:
+                    pooled = None
+                    break
+                pooled.update({p: (a[p], b[p]) for p in a})
+            diff = paired_bootstrap_difference({p: v[0] for p, v in pooled.items()}, {p: v[1] for p, v in pooled.items()}, sorted(pooled)) if pooled and population != "s2-mix" else None
+            t.add(code(layout), MIX_LABELS[population], *[r.mean(layout, population, ours, g) for g in groups], diff)
     return t
 
 
@@ -339,6 +384,7 @@ TABLES = {
     "action_rule_returns": action_rule_returns,
     "policy_selection": policy_selection,
     "mixed_populations": mixed_populations,
+    "mixed_populations_other_groups": mixed_populations_other_groups,
     "reinforce": reinforce,
 }
 

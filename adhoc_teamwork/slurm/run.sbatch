@@ -5,7 +5,11 @@
 #SBATCH --account=scavenger
 #SBATCH --mem=32gb
 #SBATCH --ntasks=4
-#SBATCH --gres=gpu:rtxa4000:1
+#SBATCH --gres=gpu:1
+# Any Turing (RTX 2080 Ti) or Pascal (GTX 1080 Ti, P6000) GPU: the jobs are bound by
+# Python environment stepping and use well under 1 GB of GPU memory, and these are
+# much easier to get than A4000s. The PyTorch build (2.5.1, CUDA 11.8) supports both.
+#SBATCH --constraint=Turing|Pascal
 #SBATCH --requeue
 #SBATCH --open-mode=append
 #SBATCH --output=/cmlscratch/%u/adhoc_teamwork/logs/%x-%j.out

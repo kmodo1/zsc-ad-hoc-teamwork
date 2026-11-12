@@ -203,3 +203,22 @@ def test_paired_difference_reports_p_value_over_distinct_agents():
     base = {p: 0.0 for p in partners}
     result = paired_bootstrap_difference({p: 1.0 for p in partners}, base, partners)
     assert result["p_value"] == 2 / 1024, "10 agents, not 20 checkpoints"
+
+
+def test_report_tables_correct_each_column_separately():
+    from adhoc_teamwork.scripts.report_tables import Table
+
+    def cell(p):
+        return {"mean_difference": 1.0, "ci95_low": 0.5, "ci95_high": 1.5, "p_value": p}
+
+    table = Table("t", ["Layout", "Population", "A", "B"])
+    table.add("x", "y", cell(0.01), cell(0.03))
+    table.add("x", "z", cell(0.02), "n/a")
+    lines = table.render().splitlines()
+    rows = [line for line in lines if line.startswith("| x")]
+    # Column A: Holm-adjusted 0.02 and 0.02, both significant. Column B alone: 0.03.
+    assert rows[0].count("†") == 2 and rows[1].count("†") == 1
+    strict = Table("t", ["Layout", "Population", "A"])
+    for _ in range(36):
+        strict.add("x", "y", cell(2 / 1024))
+    assert "†" not in strict.render().split("|---")[1], "36 comparisons of 10 agents cannot all survive"
